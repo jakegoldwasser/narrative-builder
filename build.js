@@ -1,4 +1,4 @@
-// Builds narratives/index.html from src/index.html, putting veracross-filler.js in as the
+// Builds index.html from src/index.html, putting veracross-filler.js in as the
 // "Fill Veracross" bookmarklet. Run from the repository root:  node build.js
 const fs = require('fs'), path = require('path');
 const dir = __dirname;
