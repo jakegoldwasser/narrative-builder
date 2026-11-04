@@ -384,13 +384,14 @@ function critById(id){ for(var a in RUBRIC){ var f = RUBRIC[a].crit.find(functio
 
 /* Mad-lib questions outside the rubric. Choice options may use the same tokens. */
 var SLOTS = {
-  open_adj:{opts:['a thoughtful','an engaged','a curious','a conscientious','a perceptive','an earnest','a warm and generous','a quiet but attentive','an energetic','a hardworking','a capable']},
+  open_adj:{opts:['a thoughtful','an engaged','a curious','a conscientious','a perceptive','an earnest','a warm and generous','a quiet but attentive','an energetic','a hardworking','a capable','a creative']},
   open_more:{opts:[
     '{They} bring[s] genuine curiosity and thoughtfulness to our work.',
     '{They} {has} grown noticeably in confidence this {term}.',
     '{They} approach[es] challenging texts with maturity and empathy.',
     '{They} {is} a respectful, generous member of our classroom community.',
-    '{They} {is} willing to sit with difficult questions rather than rushing to easy answers.']},
+    '{They} {is} willing to sit with difficult questions rather than rushing to easy answers.',
+    '{They} bring[s] real creativity to {their} reading and writing.']},
   read_text:{type:'text', ph:'a text we read', list:'textsList'},
   read_text_adj:{opts:['especially perceptive','insightful','imaginative','careful and nuanced','a highlight of the {term}']},
   w9_intro:{opts:[
