@@ -885,7 +885,7 @@ function choiceControl(key, st, onChange){
     var inp = document.createElement('input');
     inp.dataset.custom = key; inp.value = st.custom[key]||''; inp.placeholder='type your words';
     inp.oninput = function(){ st.custom[key]=inp.value; fit(inp); onChange(false); };
-    inp.onchange = function(){ saveWording(st, key, inp.value); onChange(true); };
+    inp.onchange = function(){ commitEdit(st, key, inp.value); onChange(true); };
     frag.appendChild(inp);
     requestAnimationFrame(function(){ fit(inp); });
   }
@@ -905,8 +905,29 @@ function optionsHtml(key, st, groups, fmt){
 /* Editing an answer starts from its words as they read now. */
 function startEdit(st, key, fmt){
   var v = SLOTS[key] ? choiceOf(key, st) : st.sel[key];
-  if(v!=='__custom'){ st.custom[key] = v ? fmt(resolve(v, st)) : ''; st.sel[key] = '__custom'; }
-  setTimeout(function(){ var el = document.querySelector('[data-custom="'+key+'"]'); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+  if(v!=='__custom'){ st.custom[key] = v ? fmt(resolve(v, st)) : ''; st.sel[key] = '__custom'; editFrom[st.id+'|'+key] = v; }
+  focusAfterRender = key; // the box exists once the sections are redrawn, which the caller does next
+}
+var focusAfterRender = null, editFrom = {};
+/* Saves an edit for everyone from now on, and offers to give it to the students who still have the wording it replaced. */
+function commitEdit(st, key, text, level){
+  var from = editFrom[st.id+'|'+key]; delete editFrom[st.id+'|'+key];
+  saveWording(st, key, text, level);
+  var tpl = st.sel[key]==='__custom' ? templatize((text||'').trim(), st) : st.sel[key];
+  var others = from ? state.students.filter(function(s){ return s!==st && s.sel[key]===from && s.override==null; }) : [];
+  if(!others.length){ toast('Saved. Students you mark from now on get this wording.'); return; }
+  toast('Saved for students from now on. '+others.length+' other student'+(others.length===1?' has':'s have')+' the old wording.', function(){
+    others.forEach(function(s){ s.sel[key] = tpl; delete s.auto[key]; touch(s); });
+    renderAll(); toast('Changed for '+others.length+' more student'+(others.length===1?'':'s'));
+  }, 'Change '+(others.length===1?'them':'them all')+' too');
+}
+function focusEditBox(){
+  var key = focusAfterRender; focusAfterRender = null;
+  var el = key && document.querySelector('[data-custom="'+key+'"]');
+  if(!el) return;
+  el.focus({preventScroll:true});
+  el.setSelectionRange(el.value.length, el.value.length);
+  el.scrollIntoView({block:'center'});
 }
 function editTools(st, key, onChange, fmt, level){
   var frag = document.createDocumentFragment();
@@ -915,7 +936,7 @@ function editTools(st, key, onChange, fmt, level){
   if(v==='__custom'){
     b.textContent = 'Save wording'; b.title = 'Keep these words, and offer them first for every student from now on';
     b.onmousedown = function(e){ e.preventDefault(); };
-    b.onclick = function(){ saveWording(st, key, st.custom[key], level); onChange(true); toast('Saved: offered first for every student'); };
+    b.onclick = function(){ commitEdit(st, key, st.custom[key], level); onChange(true); };
   } else {
     b.textContent = '✎ Edit'; b.title = 'Change these words. Your version is kept and offered first for every student.';
     b.onclick = function(){ startEdit(st, key, fmt); onChange(true); };
@@ -933,7 +954,7 @@ function editBox(st, key, onChange, level, ph){
   var ta = document.createElement('textarea'); ta.rows=2; ta.placeholder=ph; ta.dataset.custom = key;
   ta.value = st.custom[key]||'';
   ta.oninput = function(){ st.custom[key]=ta.value; onChange(false); };
-  ta.onchange = function(){ saveWording(st, key, ta.value, level); onChange(true); };
+  ta.onchange = function(){ commitEdit(st, key, ta.value, level); onChange(true); };
   return ta;
 }
 function textControl(key, st, onChange){
@@ -1002,7 +1023,7 @@ function renderSections(){
   if(!st) return;
   var onChange = function(rebuild){
     touch(st);
-    if(rebuild){ var y=$('builder').scrollTop; renderSections(); $('builder').scrollTop=y; }
+    if(rebuild){ var y=$('builder').scrollTop, f=focusAfterRender; renderSections(); if(!f) $('builder').scrollTop=y; }
     else box.querySelectorAll('.sent').forEach(function(sp){ sp.classList.toggle('off', !fillSentence(sp._sent, st)); });
     renderPreview(); renderList();
   };
@@ -1040,6 +1061,7 @@ function renderSections(){
     box.appendChild(d);
     requestAnimationFrame(grow);
   });
+  focusEditBox();
 }
 /* Between two sections: whether the second starts a new paragraph (for every student). */
 function breakToggle(sec){
@@ -1369,9 +1391,9 @@ function copyText(text, msg, fallbackEl){
     navigator.clipboard.writeText(text).then(function(){ toast(msg); }, legacy);
   } else legacy();
 }
-var toastT; function toast(m, undo){
+var toastT; function toast(m, undo, label){
   var t=$('toast'); t.textContent=m; t.classList.add('on'); t.classList.toggle('act', !!undo);
-  if(undo){ var b=document.createElement('button'); b.type='button'; b.textContent='Undo'; b.onclick=function(){ t.classList.remove('on'); undo(); }; t.appendChild(b); }
+  if(undo){ var b=document.createElement('button'); b.type='button'; b.textContent=label||'Undo'; b.onclick=function(){ t.classList.remove('on'); undo(); }; t.appendChild(b); }
   clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on');}, undo ? 12000 : 2600);
 }
 
