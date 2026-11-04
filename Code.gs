@@ -212,6 +212,11 @@ function saveState(json) {
       if (d.trash[s.id]) delete d.trash[s.id];
     });
     // each student's narrative for the doc, from the window that has its newest copy
+    // (an older builder page sends `doc`, one row per student in list order, instead of `rows`)
+    if (!p.rows && Array.isArray(p.doc)) {
+      p.rows = {};
+      (p.order || []).forEach(function (id, i) { if (p.doc[i]) { p.rows[id] = p.doc[i]; p.rows[id].at = (d.students[id] && d.students[id].at) || 0; } });
+    }
     Object.keys(p.rows || {}).forEach(function (id) {
       var r = p.rows[id];
       if (d.students[id] && (incoming[id] || atOf(id) <= (r.at || 0))) d.rows[id] = r;
@@ -271,7 +276,8 @@ function writeDoc_(rows) {
   body.clear();
   var tz = Session.getScriptTimeZone();
   var first = body.getParagraphs()[0];
-  first.setText('Student Narratives').setHeading(DocumentApp.ParagraphHeading.TITLE);
+  first.setText('Student Narratives'); // setText returns nothing, so the heading is set on its own line
+  first.setHeading(DocumentApp.ParagraphHeading.TITLE);
   var started = rows.filter(function (r) { return r.words > 0; }).length;
   body.appendParagraph(started + ' of ' + rows.length + ' started · updated ' +
       Utilities.formatDate(new Date(), tz, 'MMM d, h:mm a') +

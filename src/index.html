@@ -1583,7 +1583,12 @@ if(isGAS){
   $('modeLabel').textContent = 'saving to your Google Doc';
   google.script.run.withSuccessHandler(function(url){ if(url){ $('docLink').href = url; $('docLink').hidden = false; } }).getDocUrl();
   google.script.run
-    .withSuccessHandler(function(json){ var d = json?JSON.parse(json):null; loaded = true; boot(d); lastRev = d && d.rev || '0'; trashCache = d && d.trash || []; renderTrash(); setStatus('All changes saved'); })
+    .withSuccessHandler(function(json){
+      var d = json?JSON.parse(json):null; loaded = true; boot(d); lastRev = d && d.rev || '0'; trashCache = d && d.trash || []; renderTrash();
+      // rewrite the doc from what's here now, so it always matches the builder (sends nothing new: no copy is replaced)
+      if(state.students.length){ state.students.forEach(function(s){ dirty.add(s.id); }); setStatus('Updating the Google Doc…'); flush(); }
+      else setStatus('Loaded from your Drive');
+    })
     .withFailureHandler(function(e){
       // Never start empty: an empty window could look like lost work, or be typed into. Nothing has been changed.
       setStatus('Couldn’t load', true);
