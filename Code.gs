@@ -215,11 +215,11 @@ function saveState(json) {
     // (an older builder page sends `doc`, one row per student in list order, instead of `rows`)
     if (!p.rows && Array.isArray(p.doc)) {
       p.rows = {};
-      (p.order || []).forEach(function (id, i) { if (p.doc[i]) { p.rows[id] = p.doc[i]; p.rows[id].at = (d.students[id] && d.students[id].at) || 0; } });
+      (p.order || []).forEach(function (id, i) { if (p.doc[i]) { p.rows[id] = p.doc[i]; p.rows[id].at = -1; } }); // used only for students this save itself brought
     }
     Object.keys(p.rows || {}).forEach(function (id) {
       var r = p.rows[id];
-      if (d.students[id] && (incoming[id] || atOf(id) <= (r.at || 0))) d.rows[id] = r;
+      if (d.students[id] && (incoming[id] || (r.at !== -1 && atOf(id) <= (r.at || 0)))) d.rows[id] = r;
     });
 
     var order = (p.order || []).filter(function (id) { return d.students[id]; });
@@ -278,7 +278,7 @@ function writeDoc_(rows) {
   var first = body.getParagraphs()[0];
   first.setText('Student Narratives'); // setText returns nothing, so the heading is set on its own line
   first.setHeading(DocumentApp.ParagraphHeading.TITLE);
-  var started = rows.filter(function (r) { return r.words > 0; }).length;
+  var started = rows.filter(function (r) { return r.state ? r.state !== 'blank' : r.words > 0; }).length; // a default closing alone isn't started
   body.appendParagraph(started + ' of ' + rows.length + ' started · updated ' +
       Utilities.formatDate(new Date(), tz, 'MMM d, h:mm a') +
       ' · Edit in Narratives → Open Narrative Builder (changes made directly here are overwritten).')
