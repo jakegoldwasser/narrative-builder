@@ -24,6 +24,7 @@ Copy the name column from your Google Sheet, plus the grade and pronoun columns 
 - detects header rows and grade/pronoun columns, and accepts "Last, First"
 - for separate first and last name columns, lets you say which order they're in
 - shows a preview, and skips names that are already in the list
+- with no pronoun column, starts from a guess based on the first name (very common names only; anything else, like Jordan or Sam, gets they/them). Each guess is marked in the student list ("he?") and beside Pronouns (**Guess · confirm**) until you click Confirm or choose pronouns yourself, and Send to Veracross lists any still unconfirmed
 
 ## 3. Write
 - **Only what you mark goes in.** Each rubric row you mark (Exceptionally well / Proficient / Room for growth) adds its own sentence, in the order of the rows; its dropdown swaps the wording, offers next steps, or lets you write your own. A row you don't mark, a dropdown left on “— leave out —” and an empty box add nothing. A sentence you picked or wrote yourself stays put if you change that row's level.

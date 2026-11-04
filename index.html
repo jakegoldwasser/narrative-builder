@@ -111,6 +111,9 @@
   .gadd.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .goals .rrow{padding:5px 0}
   .goals .rlabel{flex:0 0 260px}
+  .guessbtn{border:0;background:#fbf1dc;color:var(--amber);border-radius:5px;padding:0 6px;font:600 10px var(--sans);letter-spacing:.04em;text-transform:none;margin-left:4px}
+  .guessbtn:hover{background:#f4e2b8}
+  .roster .pg{font-size:10px;font-weight:600;color:var(--amber);background:#fbf1dc;border-radius:4px;padding:0 4px}
   .tag9{font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:1px 5px;letter-spacing:.05em}
 
   .banner{background:#fbf1dc;border:1px solid #ecd39b;color:#6b4d00;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
@@ -196,7 +199,7 @@
         <label class="field name"><span>Student name</span><input id="fName" autocomplete="off"></label>
         <label class="field goes"><span>Goes by</span><input id="fGoes" autocomplete="off"></label>
         <label class="field"><span>Grade</span><select id="fGrade"></select></label>
-        <label class="field"><span>Pronouns</span><select id="fPron"><option value="she">she / her</option><option value="he">he / him</option><option value="they">they / them</option><option value="name">always use their name (no pronouns)</option></select></label>
+        <label class="field"><span>Pronouns <button type="button" class="guessbtn" id="pronOk" hidden title="These pronouns were guessed from the first name. Click once you've checked they're right.">Guess · confirm</button></span><select id="fPron"><option value="she">she / her</option><option value="he">he / him</option><option value="they">they / them</option><option value="name">always use their name (no pronouns)</option></select></label>
         <div class="grow"></div>
         <button class="btn" id="clearBtn" title="Clear every answer for this student">Clear sheet</button>
         <button class="btn ghost danger" id="delBtn">Remove student</button>
@@ -227,7 +230,7 @@
     <label class="inline">If two name columns, they're
       <select id="pOrder"><option value="fl">First | Last</option><option value="lf">Last | First</option></select></label>
     <label class="inline">Default grade <select id="pGrade"></select></label>
-    <label class="inline">Default pronouns <select id="pPron"><option value="they">they/them</option><option value="she">she/her</option><option value="he">he/him</option><option value="name">name only</option></select></label>
+    <label class="inline">Pronouns <select id="pPron"><option value="guess">guess from first name (check each one)</option><option value="they">they/them</option><option value="she">she/her</option><option value="he">he/him</option><option value="name">name only</option></select></label>
   </div>
   <div class="pastePv" id="pastePv"><span style="color:var(--muted)">Preview appears here.</span></div>
   <div class="actions"><button class="btn" onclick="pasteDlg.close()">Cancel</button><button class="btn primary" id="pasteAdd">Add students</button></div>
@@ -526,6 +529,15 @@ function firstName(full){
   if(full.indexOf(',')>-1) return (full.split(',')[1]||'').trim().split(/\s+/)[0] || full.split(',')[0];
   return full.split(/\s+/)[0];
 }
+/* A starting guess from common first names, to save setting every student by hand. Only names that are
+   very commonly one or the other are listed; anything else (Jordan, Riley, Sam…) gets "they". A guess is
+   marked (pronGuess) in the list and beside Pronouns until the teacher confirms or changes it. */
+var NAMES_SHE = ('abigail ada addison adeline adriana alexa alexandra alexis alice alicia alina alison allison alyssa amanda amara amelia amy ana anastasia andrea angela angelina anna annabel annabelle anne annie anya ariana arianna audrey aurora ava bella beatrice bianca brianna brooke camila camille caroline catherine cecilia charlotte chelsea chloe claire clara clementine cora daisy daniela daphne delilah diana elena eleanor eliana elisa eliza elizabeth ella ellie eloise elsa emilia emily emma esme esther eva evelyn faith fatima fiona francesca gabriela gabriella gabrielle genevieve georgia gianna grace gracie hailey hana hannah harper hazel helen imogen ingrid iris isabel isabella isabelle isla ivy jacqueline jade jane jasmine jenna jennifer jessica josephine julia juliana julie juliet june kaitlyn katherine kathryn katie kayla kylie lara laura lauren layla leah leila lena lila lilah liliana lillian lily lucia lucy luna lydia mabel madeleine madeline madison maeve maria mariana marina margaret maya megan melanie mia michelle mila miriam molly naomi natalia natalie nina noa nora olivia penelope phoebe piper poppy priya rachel rebecca rosa rose rosie ruby ruth sabrina sadie samantha sara sarah savannah scarlett serena sienna sofia sophia sophie stella summer talia tessa valentina valeria vanessa victoria violet vivian willa zara zoe zoey').split(' ');
+var NAMES_HE = ('aaron abraham adam adrian aidan alan albert alexander alfred andrew angelo anthony antonio arjun arthur asher august austin axel benjamin bennett brandon brian bruno caleb calvin carlos carter cayden charles christian christopher cole colin connor cooper daniel dante david declan dennis diego dominic douglas dylan edward eli elias elijah emmanuel eric ethan evan ezra felix finn francis frank gabriel george gideon graham grant gregory gus gustavo harrison harry hector henry hudson hugo ian isaac isaiah ivan jack jackson jacob jake james jared jasper javier jeremiah jeremy jonah jonathan jose joseph joshua josiah juan julian justin kevin kenneth kyle laurence leo leon leonardo levi liam lincoln lorenzo louis luca lucas luis luke malcolm marco marcus mark martin mason matthew max maxwell michael miles mohammed muhammad nathan nathaniel nicholas noah oliver omar oscar owen patrick paul peter philip ralph raphael richard robert roman ryan samuel sebastian seth simon stephen steven theo theodore thomas timothy tobias tristan victor vincent walter william wyatt xavier zachary zachariah').split(' ');
+function guessPronouns(first){
+  var n = (first||'').trim().split(/[\s-]+/)[0].toLowerCase();
+  return NAMES_SHE.indexOf(n)>-1 ? 'she' : NAMES_HE.indexOf(n)>-1 ? 'he' : 'they';
+}
 function newStudent(name, grade, pron){
   return {id:uid(), name:name||'', goesBy:firstName(name), grade:grade||'9', pronouns:pron||'they',
     sel:{}, custom:{}, text:{}, extra:{}, rub:{}, auto:{}, w9:{mode:'quote', piece:'poem', pieceCustom:''}, override:null};
@@ -731,7 +743,7 @@ function renderList(){
     var s = status(st);
     var li = document.createElement('li');
     if(st.id===state.currentId) li.className='sel';
-    li.innerHTML = '<span class="dot '+s.cls+'"></span><span class="nm">'+esc(st.name||'(no name)')+'</span><span class="wc">'+s.w+'</span>';
+    li.innerHTML = '<span class="dot '+s.cls+'"></span><span class="nm">'+esc(st.name||'(no name)')+'</span>'+(st.pronGuess?'<span class="pg" title="Pronouns guessed from the first name: not yet confirmed">'+esc(st.pronouns)+'?</span>':'')+'<span class="wc">'+s.w+'</span>';
     li.onclick = function(){ select(st.id); };
     ul.appendChild(li);
   });
@@ -993,6 +1005,7 @@ function renderHeader(){
   if(!st && state.students.length){ state.currentId = state.students[0].id; return renderAll(); }
   if(!st) return;
   $('fName').value = st.name; $('fGoes').value = st.goesBy; $('fGrade').value = st.grade; $('fPron').value = st.pronouns;
+  $('pronOk').hidden = !st.pronGuess;
 }
 function renderAll(){ renderHeader(); renderList(); renderSections(); renderPreview(); }
 
@@ -1005,11 +1018,15 @@ $('fName').oninput = function(){
   var st=cur(); var oldFirst = firstName(st.name);
   st.name = this.value;
   if(!st.goesBy || st.goesBy===oldFirst){ st.goesBy = firstName(st.name); $('fGoes').value = st.goesBy; }
+  reguess(st);
   touch(st); renderList(); renderPreview(); debounceSections();
 };
-$('fGoes').oninput = function(){ var st=cur(); st.goesBy=this.value; touch(st); renderPreview(); renderList(); debounceSections(); };
+/* While the pronouns are still a guess, the guess follows the name as it's typed. */
+function reguess(st){ if(st.pronGuess){ st.pronouns = guessPronouns(nameOf(st)); $('fPron').value = st.pronouns; } }
+$('fGoes').oninput = function(){ var st=cur(); st.goesBy=this.value; reguess(st); touch(st); renderPreview(); renderList(); debounceSections(); };
 $('fGrade').onchange = function(){ var st=cur(); st.grade=this.value; touch(st); renderAll(); };
-$('fPron').onchange = function(){ var st=cur(); st.pronouns=this.value; touch(st); renderAll(); };
+$('fPron').onchange = function(){ var st=cur(); st.pronouns=this.value; st.pronGuess=false; touch(st); renderAll(); };
+$('pronOk').onclick = function(){ var st=cur(); st.pronGuess=false; touch(st); renderAll(); toast('Pronouns confirmed for '+nameOf(st)); };
 $('termSel').onchange = function(){ state.settings.term=this.value; touchAll(); renderAll(); };
 $('linkChk').onchange = function(){ state.settings.link=this.checked; touchAll(); renderAll(); };
 var secTimer; function debounceSections(){ clearTimeout(secTimer); secTimer=setTimeout(renderSections, 500); }
@@ -1033,7 +1050,7 @@ $('clearBtn').onclick = function(){
 };
 $('addBtn').onclick = function(){
   var last = cur();
-  var st = newStudent('', last?last.grade:'9', 'they');
+  var st = newStudent('', last?last.grade:'9', 'they'); st.pronGuess = true;
   state.students.push(st); state.currentId=st.id; touch(st); renderAll(); $('fName').focus();
 };
 $('sortBtn').onclick = function(){
@@ -1071,7 +1088,7 @@ function parseRoster(){
       });
       return;
     }
-    var rec={grade:dg, pron:dp, names:[], first:'', last:'', goes:''};
+    var rec={grade:dg, pron:dp==='guess' ? '' : dp, names:[], first:'', last:'', goes:''};
     cells.forEach(function(c, i){
       if(!c) return;
       var role = cols ? cols[i] : '';
@@ -1088,7 +1105,10 @@ function parseRoster(){
     if(rec.first||rec.last) name = (rec.first+' '+rec.last).trim();
     else if(rec.names.length>=2) name = order==='fl' ? rec.names[0]+' '+rec.names[1] : rec.names[1]+' '+rec.names[0];
     else if(rec.names.length===1){ name = rec.names[0]; var m=name.match(/^([^,]+),\s*(.+)$/); if(m) name = m[2]+' '+m[1]; }
-    if(name) out.push({name:name.replace(/\s+/g,' '), goes:rec.goes, grade:rec.grade, pron:rec.pron});
+    if(!name) return;
+    name = name.replace(/\s+/g,' ');
+    var guessed = !rec.pron;
+    out.push({name:name, goes:rec.goes, grade:rec.grade, pron:guessed ? guessPronouns(rec.goes || firstName(name)) : rec.pron, guessed:guessed});
   });
   return out;
 }
@@ -1097,7 +1117,7 @@ function previewPaste(){
   var existing = state.students.map(function(s){return s.name.toLowerCase();});
   $('pastePv').innerHTML = rows.length ? rows.map(function(r){
     var dup = existing.indexOf(r.name.toLowerCase())>-1;
-    return '<div>'+esc(r.name)+(r.goes?' ('+esc(r.goes)+')':'')+' · grade '+r.grade+' · '+r.pron+(dup?' <i style="color:var(--amber)">already added</i>':'')+'</div>';
+    return '<div>'+esc(r.name)+(r.goes?' ('+esc(r.goes)+')':'')+' · grade '+r.grade+' · '+r.pron+(r.guessed?' <i style="color:var(--amber)">(guess)</i>':'')+(dup?' <i style="color:var(--amber)">already added</i>':'')+'</div>';
   }).join('') : '<span style="color:var(--muted)">No names found yet.</span>';
   $('pasteAdd').textContent = 'Add '+rows.length+' student'+(rows.length===1?'':'s');
 }
@@ -1106,7 +1126,7 @@ $('pasteAdd').onclick = function(){
   var rows = parseRoster(), existing = state.students.map(function(s){return s.name.toLowerCase();}), added=0, first=null;
   rows.forEach(function(r){
     if(existing.indexOf(r.name.toLowerCase())>-1) return;
-    var st = newStudent(r.name, r.grade, r.pron); if(r.goes) st.goesBy=r.goes;
+    var st = newStudent(r.name, r.grade, r.pron); if(r.goes) st.goesBy=r.goes; if(r.guessed) st.pronGuess = true;
     state.students.push(st); dirty.add(st.id); added++; if(!first) first=st;
   });
   $('pasteDlg').close();
@@ -1122,7 +1142,9 @@ function vcPayload(){
 }
 function vcRefresh(){
   var p = vcPayload(), skipped = state.students.length - p.length;
-  $('vcSummary').textContent = p.length+' narrative'+(p.length===1?'':'s')+' ready'+(skipped?' · '+skipped+' not finished, left out':'')+'.';
+  var guesses = state.students.filter(function(s){ return s.pronGuess; }).map(function(s){ return s.name||'(no name)'; });
+  $('vcSummary').textContent = p.length+' narrative'+(p.length===1?'':'s')+' ready'+(skipped?' · '+skipped+' not finished, left out':'')+'.'
+    + (guesses.length ? ' Pronouns still a guess (not yet confirmed): '+guesses.join(', ')+'.' : '');
   $('vcOut').value = JSON.stringify(p);
 }
 $('vcBtn').onclick = function(){ vcRefresh(); $('vcDlg').showModal(); };
