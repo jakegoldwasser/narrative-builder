@@ -129,7 +129,10 @@
   .pv-body{flex:1;overflow:auto;padding:14px 18px}
   #pvText{font-family:var(--serif);font-size:16px;line-height:1.6;margin:0}
   #pvText mark{background:#fbf1dc;color:var(--amber);border-radius:3px;padding:0 2px}
-  #ovText{width:100%;height:100%;min-height:300px;font-family:var(--serif);font-size:16px;line-height:1.6;border:1px solid var(--accent);border-radius:8px;padding:10px}
+  #ovText{width:100%;height:100%;min-height:300px;font-family:var(--serif);font-size:16px;line-height:1.6;border:1px solid transparent;border-radius:8px;padding:8px 10px;margin:-8px -10px;width:calc(100% + 20px);background:transparent;resize:none}
+  #ovText:hover{border-color:var(--line)}
+  #ovText:focus{border-color:var(--accent);background:#fff;outline:none}
+  #ovText::placeholder{color:var(--muted);font-style:italic}
   .pv-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
   .pv-foot .btn{flex:1}
   .empty{max-width:440px;margin:80px auto;text-align:center;color:var(--muted)}
@@ -204,7 +207,7 @@
         <button class="btn" id="clearBtn" title="Clear every answer for this student">Clear sheet</button>
         <button class="btn ghost danger" id="delBtn">Remove student</button>
       </div>
-      <div id="ovBanner" class="banner" hidden><span>You're editing this narrative by hand, so the choices below won't change it.</span><button class="btn" id="ovRevert">Back to builder</button></div>
+      <div id="ovBanner" class="banner" hidden><span>You've edited this narrative by hand, so the choices below won't change it.</span><button class="btn" id="ovRevert">Back to builder</button></div>
       <div id="sections"></div>
     </div>
   </main>
@@ -212,11 +215,10 @@
   <aside class="preview">
     <div class="pv-head"><b>Narrative</b><span class="meter" id="meter">0 / 200 words</span></div>
     <div class="bar" id="bar"><i style="width:0"></i></div>
-    <div class="pv-body"><div id="pvText"></div><p id="overNote" class="overnote" hidden></p><textarea id="ovText" hidden></textarea></div>
+    <div class="pv-body"><div id="pvText" hidden></div><textarea id="ovText" placeholder="Nothing yet. Only what you mark or choose goes into the narrative, or type it here yourself." title="Type here to edit the narrative by hand"></textarea><p id="overNote" class="overnote" hidden></p></div>
     <div class="pv-foot">
       <button class="btn" id="prevBtn">← Prev</button>
       <button class="btn" id="copyBtn">Copy</button>
-      <button class="btn" id="editBtn">Edit by hand</button>
       <button class="btn" id="nextBtn">Next →</button>
     </div>
   </aside>
@@ -629,80 +631,70 @@ function sentTone(sent, st){
   var m = sent.tpl.match(/^<<(\w+)>>$/);
   return m && st.sel[m[1]]==='__custom' ? 'own' : 'pos';
 }
-/* "To Work On": the chosen goals as linked sentences. */
+/* "To Work On": the chosen goals, two to a sentence, joined by "and":
+   "Going forward, she would benefit from A and from B. I encourage her to focus on C and on D." */
 function goalItems(st){
-  var out=[], phrases=[], h=hashOf(st.id+'towork');
+  var out=[], phrases=[];
   GOALS.forEach(function(g){
     var v = st.sel['g_'+g.id];
     if(!v) return;
     if(v==='__custom'){ var t=(st.custom['g_'+g.id]||'').trim(); if(t) out.push({t:t, tone:'own', at:phrases.length}); return; }
     phrases.push(v);
   });
-  var FIRST = ['Going forward, {they} would benefit from P.', 'Going forward, I encourage {them} to focus on P.', 'In the {term} ahead, {they} would benefit from P.'];
-  var MID = ['{They} would also benefit from P.', 'I also encourage {them} to focus on P.', 'In addition, I hope to see {them} work on P.'];
-  var LAST = ['Finally, I hope to see {them} focus on P.', 'Finally, {they} would benefit from P.'];
-  var used = {};
-  var keys = function(f){ return f.match(/focus on|benefit|hope/g) || []; };
-  var res = phrases.map(function(p, k){
-    var set = k===0 ? FIRST : (k===phrases.length-1 && k>1) ? LAST : MID;
-    // "focus on", "benefit" and "hope" each once, as far as the frames allow
-    var f = set[(h+k)%set.length], best = -1;
-    for(var n=0; n<set.length; n++){
-      var c = set[(h+k+n)%set.length], clash = keys(c).filter(function(x){ return used[x]; }).length;
-      if(best<0 || clash<best){ best = clash; f = c; }
-    }
-    keys(f).forEach(function(x){ used[x] = true; });
-    return {t:f.replace('P', p), tone:'grow', goal:true};
+  // Two short goals share a sentence ("from A and from B"); a long one has its own.
+  var FRAMES = [['Going forward, {they} would benefit from ', 'from '], ['I encourage {them} to focus on ', 'on '], ['I hope to see {them} prioritize ', '']];
+  var groups = [];
+  for(var k=0; k<phrases.length; k++){
+    var A = phrases[k], B = phrases[k+1];
+    if(B && wordsIn(A)+wordsIn(B) <= 26){ groups.push([A, B]); k++; } else groups.push([A]);
+  }
+  var res = groups.map(function(g, n){
+    var f = n===0 ? FRAMES[0] : FRAMES[1 + (n-1)%2];
+    var t = f[0] + g[0] + (g[1] ? (/,/.test(g[0]) ? ', and ' : ' and ') + f[1] + g[1] : '') + '.';
+    if(n>1 && n===groups.length-1) t = 'Finally, ' + lowerStart(t);
+    return {t:t, tone:'grow', goal:true, at:n};
   });
   // the teacher's own goals go where they are in the list
-  out.slice().reverse().forEach(function(o){ res.splice(o.at, 0, o); });
+  out.slice().reverse().forEach(function(o){
+    var n = 0, seen = 0; // after the groups holding the goals listed before it
+    while(n<groups.length && seen + groups[n].length <= o.at){ seen += groups[n].length; n++; }
+    res.splice(n, 0, o);
+  });
   return res;
-}
-/* Turns "{They} read[s]…" into "{They} also read[s]…", "I encourage…" into "I also encourage…". */
-function withAlso(t){
-  var m = t.match(/^\{They\} (\{is\}|\{has\}|would|should|can|will) /);
-  if(m) return t.replace(m[0], '{They} '+m[1]+' also ');
-  if(/^\{They\} /.test(t)) return t.replace(/^\{They\} /, '{They} also ');
-  if(/^I encourage /.test(t)) return t.replace(/^I encourage /, 'I also encourage ');
-  return null;
 }
 function lowerStart(t){ return /^\{/.test(t) ? '{'+t.charAt(1).toLowerCase()+t.slice(2) : /^I\b/.test(t) ? t : t.charAt(0).toLowerCase()+t.slice(1); }
 function wordsIn(t){ return (t.match(/\S+/g)||[]).length; }
-/* Links a section's sentences so they don't all sit side by side: "also", "In addition,", "That said,",
-   and once per section a praise followed by a goal becomes one sentence ("While she …, she would benefit …").
-   Varied by student, so a class doesn't all read alike. The teacher's own sentences are left as typed. */
+var MAX_JOINED = 36; // words in a joined sentence
+/* Links a section's sentences in pairs with punctuation and conjunctions, never by adding words to them:
+   praise and praise with ", and"; praise and a goal with "while" (once a section) or ", but"; two goals of
+   the same kind as one ("would benefit from A and from B"); a reading of a text with a semicolon.
+   The teacher's own sentences are left as typed. */
 function linkItems(items, st, sec, hasLead){
-  var h = hashOf(st.id+sec.id), adds = 0, last = '';
-  // First pass: one praise + goal pair becomes a single sentence.
-  for(var i=1; i<items.length; i++){
-    var p = items[i-1], q = items[i];
-    if(p.tone==='pos' && q.tone==='grow' && !q.goal && (i>1 || !hasLead) && /^\{They\} /.test(p.t) && /^(\{They\} would benefit|I encourage) /.test(q.t)
-       && wordsIn(p.t)+wordsIn(q.t) <= 38){
-      p.t = 'While {they} ' + p.t.replace(/^\{They\} /, '').replace(/[.!]$/, '') + ', ' + lowerStart(q.t);
-      p.tone = 'grow'; items.splice(i, 1);
-      break;
+  var out = [], whiled = false;
+  var cut = function(t){ return t.replace(/[.!]$/, ''); };
+  for(var i=0; i<items.length; i++){
+    var p = items[i], q = items[i+1], t = null;
+    if(q && !p.goal && !q.goal && p.tone!=='own' && q.tone!=='own' && wordsIn(p.t)+wordsIn(q.t) <= MAX_JOINED){
+      var pa = p.tone==='prog' ? 'pos' : p.tone, qa = q.tone==='prog' ? 'pos' : q.tone;
+      var pThey = /^(\{They\}|\{Name\}) /.test(p.t), qThey = /^\{They\} /.test(q.t);
+      if(/^\{Their\} reading of /.test(q.t)) t = cut(p.t) + '; ' + lowerStart(q.t);
+      else if(pa==='pos' && qa==='pos' && pThey && qThey) t = cut(p.t) + ', and ' + lowerStart(q.t);
+      else if(pa==='pos' && qa==='grow' && pThey){
+        if(!whiled && (i>0 || !hasLead) && /^\{They\} /.test(p.t)){ t = 'While {they} ' + cut(p.t).replace(/^\{They\} /, '') + ', ' + lowerStart(q.t); whiled = true; }
+        else t = cut(p.t) + ', but ' + lowerStart(q.t);
+      }
+      else if(pa===qa && (pa==='grow' || pa==='next')){
+        var m1 = p.t.match(/^(\{They\} would benefit from|I encourage \{them\} to) /), m2 = q.t.match(/^(\{They\} would benefit from|I encourage \{them\} to) /);
+        if(m1 && m2 && m1[1]===m2[1]){
+          var link = (/,/.test(p.t) ? ', and ' : ' and ') + (/ to$/.test(m1[1]) ? 'to ' : 'from ');
+          t = cut(p.t) + link + cut(q.t.slice(m2[0].length)) + '.';
+        } else if(m1 || m2) t = cut(p.t) + ', and ' + lowerStart(q.t);
+      }
     }
+    if(t){ out.push({t:t, tone:q.tone}); i++; }
+    else out.push(p);
   }
-  // Second pass: a transition where the next sentence adds to, turns from, or builds on the one before.
-  var ADD = ['also', 'also', 'In addition, '];
-  for(i=1; i<items.length; i++){
-    var prev = items[i-1], it = items[i];
-    if(it.goal || prev.tone==='own' || it.tone==='own' || /^While /.test(it.t)) continue;
-    var a = prev.tone==='prog' ? 'pos' : prev.tone, b = it.tone, pre = null;
-    if(b==='prog') pre = null;
-    else if(b==='next') pre = a==='next' ? 'also' : ['As a next step, ', 'To keep growing, '][h%2];
-    else if(a==='pos' && b==='grow') pre = last==='That said, ' ? 'At the same time, ' : 'That said, ';
-    else if((a==='grow' || a==='next') && b==='pos') pre = last==='At the same time, ' ? null : 'At the same time, ';
-    else if(a===b){
-      pre = /^\{Their\} reading of /.test(it.t) ? 'In particular, ' : ADD[(h+adds)%ADD.length];
-      if(pre===last) pre = 'also';
-      adds++;
-    }
-    last = pre || '';
-    if(!pre) continue;
-    if(pre==='also'){ var t = withAlso(it.t); it.t = t || 'In addition, ' + lowerStart(it.t); }
-    else it.t = pre + lowerStart(it.t);
-  }
+  items.length = 0; Array.prototype.push.apply(items, out);
   return items;
 }
 /* The sentences of one section, in order: its rubric rows, its other questions, then the teacher's own sentence. */
@@ -978,7 +970,7 @@ function w9Bar(st, onChange){
 /* ---------------- UI: preview ---------------- */
 function renderPreview(){
   var st = cur();
-  if(!st){ $('pvText').innerHTML=''; $('meter').textContent=''; $('overNote').hidden=true; return; }
+  if(!st){ $('ovText').value=''; $('meter').textContent=''; $('overNote').hidden=true; return; }
   var s = status(st);
   $('pvText').innerHTML = s.n.text ? s.n.text.split(/\n{2,}/).map(function(p){ return '<p>'+esc(p)+'</p>'; }).join('')
     : '<p class="pvempty">Nothing yet. Only what you mark or choose goes into the narrative.</p>';
@@ -993,9 +985,10 @@ function renderPreview(){
   $('ovBanner').hidden = !ov;
   $('sections').style.opacity = ov ? .45 : 1;
   $('sections').style.pointerEvents = ov ? 'none' : '';
-  $('pvText').hidden = ov; $('ovText').hidden = !ov;
-  if(ov && document.activeElement!==$('ovText')) $('ovText').value = st.override;
-  $('editBtn').textContent = ov ? 'Done editing' : 'Edit by hand';
+  // The narrative is always editable: typing in it turns it into hand edits (st.override).
+  var box = $('ovText');
+  if((document.activeElement!==box || !ov) && box.value!==s.n.text) box.value = s.n.text;
+  box.style.height = 'auto'; box.style.height = Math.max(300, box.scrollHeight+2)+'px';
 }
 
 function renderHeader(){
@@ -1062,12 +1055,7 @@ function step(d){ var i = state.students.indexOf(cur()); var n = state.students[
 $('prevBtn').onclick = function(){ step(-1); };
 $('nextBtn').onclick = function(){ step(1); };
 $('copyBtn').onclick = function(){ var st=cur(); if(st) copyText(narrative(st).text, 'Narrative copied'); };
-$('editBtn').onclick = function(){
-  var st=cur(); if(!st) return;
-  if(st.override==null){ st.override = narrative(st).text; touch(st); renderPreview(); $('ovText').focus(); }
-  else { renderPreview(); toast('Saved your edits'); }
-};
-$('ovText').oninput = function(){ var st=cur(); st.override=this.value; touch(st); renderPreview(); renderList(); };
+$('ovText').oninput = function(){ var st=cur(); if(!st) return; var was = st.override!=null; st.override=this.value; touch(st); renderPreview(); renderList(); if(!was) toast('Edited by hand. Back to builder undoes it.'); };
 $('ovRevert').onclick = function(){ var st=cur(); st.override=null; touch(st); renderAll(); };
 
 /* ---------------- Roster paste ---------------- */
