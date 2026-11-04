@@ -105,6 +105,12 @@
   .seg button{border:0;background:none;padding:4px 10px;color:var(--muted)}
   .seg button.on{background:var(--accent);color:#fff}
   .w9bar select,.w9bar input{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
+  .brk{display:flex;justify-content:center;margin:-6px 0 8px}
+  .brk .seg{font-size:12px}
+  .gadd{flex:none;border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 12px;font-size:12px;color:var(--muted)}
+  .gadd.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .goals .rrow{padding:5px 0}
+  .goals .rlabel{flex:0 0 260px}
   .tag9{font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:1px 5px;letter-spacing:.05em}
 
   .banner{background:#fbf1dc;border:1px solid #ecd39b;color:#6b4d00;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
@@ -161,6 +167,7 @@
   <label class="inline">Period
     <select id="termSel"><option>semester</option><option>quarter</option><option>year</option><option>term</option></select>
   </label>
+  <label class="inline" title="Join the sentences with transitions (also, that said, while…) so they don't all sit side by side. Your own sentences are never changed."><input type="checkbox" id="linkChk"> Link sentences</label>
   <div class="spacer"></div>
   <span class="status" id="status">Loading…</span>
   <button class="btn" id="vcBtn">Send to Veracross</button>
@@ -404,20 +411,87 @@ var SLOTS = {
     'Keep up the great work, {name}!']}
 };
 
-/* Sections, in narrative order. para: which paragraph the section's sentences go into. */
+/* To Work On: constructive goals, each a phrase that follows "would benefit from" (the narrative
+   links the chosen ones into sentences: "Going forward, …", "She would also benefit from …", "Finally, …"). */
+var GOALS = [
+  {id:'side', label:'Avoid side conversations', opts:[
+    'setting aside side conversations during class, so that {their} full attention can go to our discussions',
+    'saving conversations with classmates for outside class, so that {their} focus matches {their} considerable ability']},
+  {id:'listen', label:'Demonstrate active listening', opts:[
+    'demonstrating active listening, building on what classmates have said before offering a new idea',
+    'showing that {they} {is} listening closely by taking notes and responding directly to classmates’ points']},
+  {id:'hand', label:'Take more intellectual risks (raise hand)', opts:[
+    'taking more intellectual risks in class, such as raising {their} hand to share an idea before it feels fully formed',
+    'trusting {their} ideas enough to raise {their} hand, even when {they} {is} not yet sure of an answer']},
+  {id:'speak', label:'Speak more in class', opts:[
+    'speaking up more often in discussion, since {their} ideas are well worth hearing',
+    'contributing to class discussion more regularly, so that classmates can benefit from {their} insights']},
+  {id:'room', label:'Give others a chance to speak', opts:[
+    'making room for others in discussion, giving classmates a chance to speak before {they} speak[s] again',
+    'balancing {their} many contributions by inviting quieter classmates into the conversation']},
+  {id:'bold', label:'Make bolder arguments', opts:[
+    'taking intellectual risks in {their} writing by making bolder, more original arguments',
+    'pushing past safe, obvious claims toward arguments that might surprise a reader']},
+  {id:'annot', label:'Annotate more thoroughly', opts:[
+    'annotating more thoroughly, marking key passages and writing {their} questions and observations in the margins',
+    'making {their} annotations fuller and more detailed, so that {they} arrive[s] at class with plenty to say']},
+  {id:'careful', label:'Read and annotate more carefully', opts:[
+    'reading and annotating more carefully, slowing down to notice how the language of a passage creates meaning',
+    'giving each reading assignment {their} full attention, so that {their} annotations capture the details of the text']},
+  {id:'prompt', label:'Arrive promptly', opts:[
+    'arriving promptly to every class, so that {they} can settle in and be ready when we begin',
+    'arriving on time and ready to begin, with {their} materials out when class starts']},
+  {id:'prep', label:'Come prepared', opts:[
+    'bringing {their} annotated text and completed assignments to every class',
+    'completing each assignment fully and on time, so that {they} can take full part in our work']},
+  {id:'time', label:'Time management and proactivity', opts:[
+    'managing {their} time more proactively, starting long assignments early and reaching out in advance when a deadline becomes difficult',
+    'planning ahead for major assignments, breaking them into smaller steps and starting early']},
+  {id:'notes', label:'Take consistent notes', opts:[
+    'taking consistent notes in class without prompting',
+    'keeping fuller notes on our discussions, which will serve {them} well when {they} write[s]']},
+  {id:'evidence', label:'Ground claims in the text', opts:[
+    'grounding {their} comments and claims in specific quotations from the text',
+    'supporting each claim with close reading of the language of the text']},
+  {id:'revise', label:'Revise more substantively', opts:[
+    'making bigger, more substantive changes between drafts in response to feedback',
+    'treating revision as a chance to rethink {their} ideas, not only to correct errors']},
+  {id:'proof', label:'Proofread carefully', opts:[
+    'proofreading carefully before handing in work, attending to grammar and MLA citation',
+    'leaving time to reread {their} work aloud before handing it in']},
+  {id:'group', label:'Contribute in group work', opts:[
+    'contributing fully and staying on task during small-group work',
+    'taking a more active role in small groups, sharing {their} ideas and drawing out those of others']},
+  {id:'ac', label:'Seek help from the Academic Center', opts:[
+    'making use of the Academic Center, where {they} can build strong habits of study and organization',
+    'visiting the Academic Center for support with planning and study skills']},
+  {id:'hours', label:'Seek help in student hours', opts:[
+    'coming to see me in student hours, where we can work through drafts and questions one on one',
+    'seeking my help in student hours whenever a reading or assignment feels difficult']}
+];
+function goalById(id){ return GOALS.find(function(g){ return g.id===id; }); }
+
+/* Sections, in narrative order. Whether a section starts a new paragraph is a class-wide setting (settings.breaks). */
 var SECTIONS = [
-  {id:'open', title:'Opening', para:1, sents:[
+  {id:'open', title:'Opening', sents:[
     {tpl:'{Name} is <<open_adj>> member of our English {grade} class.'},
     {tpl:'<<open_more>>'}]},
-  {id:'read', title:'Reading', para:1, rubric:'read', sents:[
+  {id:'read', title:'Reading', rubric:'read', sents:[
     {tpl:'{Their} reading of <<read_text>> was <<read_text_adj>>.', after:true}]},
-  {id:'write', title:'Writing', para:1, rubric:'write', sents:[]},
-  {id:'part', title:'Class Participation', para:1, rubric:'part', sents:[]},
-  {id:'sw', title:'Student Writing', para:2, grades:['9'], sents:[
+  {id:'write', title:'Writing', rubric:'write', sents:[]},
+  {id:'part', title:'Class Participation', rubric:'part', sents:[]},
+  {id:'sw', title:'Student Writing', grades:['9'], sents:[
     {tpl:'<<w9_intro>> “<<w9_quote>>”', w9:'quote'},
     {tpl:'{Name}’s {piece} about <<w9_topic>> was <<w9_adj>>.', w9:'topic'}]},
-  {id:'close', title:'Closing', para:'last', sents:[{tpl:'<<close>>'}]}
+  {id:'close', title:'Closing', sents:[{tpl:'<<close>>'}]},
+  {id:'towork', title:'To Work On', goals:true, sents:[]}
 ];
+var DEFAULT_BREAKS = {sw:true, towork:true};
+function defaultSettings(s){
+  var d = Object.assign({term:'semester', link:true}, s||{});
+  d.breaks = Object.assign({}, DEFAULT_BREAKS, d.breaks||{});
+  return d;
+}
 function sectionsFor(st){ return SECTIONS.filter(function(s){ return !s.grades || s.grades.indexOf(st.grade)>-1; }); }
 
 function hashOf(str){ var h=0; for(var i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))|0; } return Math.abs(h); }
@@ -438,7 +512,7 @@ function clearSheet(st){ st.rub={}; st.sel={}; st.auto={}; st.custom={}; st.text
 
 /* ---------------- State ---------------- */
 var KEY = 'narrativeBuilder.v1';
-var state = {settings:{term:'semester'}, students:[], currentId:null};
+var state = {settings:defaultSettings(), students:[], currentId:null};
 var isGAS = typeof google === 'object' && google.script && google.script.run;
 var $ = function(id){ return document.getElementById(id); };
 
@@ -529,27 +603,119 @@ function tidy(s){
   if(s && !/[.!?”"]$/.test(s)) s += '.';
   return cap(s);
 }
+/* How a sentence reads, for linking: 'pos' (praise or progress), 'grow' (room for growth), 'next' (a stretch
+   goal for a strong student), 'own' (the teacher's own words, never changed). */
+function critTone(c, st){
+  var v = st.sel[c.id];
+  if(v==='__custom') return 'own';
+  if(c.opts.next.indexOf(v)>-1) return 'next';
+  if(/would benefit|^I encourage/.test(v)) return 'grow';
+  return c.opts[1].indexOf(v)>-1 ? 'prog' : 'pos'; // 'prog': "She is learning to…", which needs no transition
+}
+function sentTone(sent, st){
+  var m = sent.tpl.match(/^<<(\w+)>>$/);
+  return m && st.sel[m[1]]==='__custom' ? 'own' : 'pos';
+}
+/* "To Work On": the chosen goals as linked sentences. */
+function goalItems(st){
+  var out=[], phrases=[], h=hashOf(st.id+'towork');
+  GOALS.forEach(function(g){
+    var v = st.sel['g_'+g.id];
+    if(!v) return;
+    if(v==='__custom'){ var t=(st.custom['g_'+g.id]||'').trim(); if(t) out.push({t:t, tone:'own', at:phrases.length}); return; }
+    phrases.push(v);
+  });
+  var FIRST = ['Going forward, {they} would benefit from P.', 'Going forward, I encourage {them} to focus on P.', 'In the {term} ahead, {they} would benefit from P.'];
+  var MID = ['{They} would also benefit from P.', 'I also encourage {them} to focus on P.', 'In addition, I hope to see {them} work on P.'];
+  var LAST = ['Finally, I hope to see {them} focus on P.', 'Finally, {they} would benefit from P.'];
+  var used = {};
+  var keys = function(f){ return f.match(/focus on|benefit|hope/g) || []; };
+  var res = phrases.map(function(p, k){
+    var set = k===0 ? FIRST : (k===phrases.length-1 && k>1) ? LAST : MID;
+    // "focus on", "benefit" and "hope" each once, as far as the frames allow
+    var f = set[(h+k)%set.length], best = -1;
+    for(var n=0; n<set.length; n++){
+      var c = set[(h+k+n)%set.length], clash = keys(c).filter(function(x){ return used[x]; }).length;
+      if(best<0 || clash<best){ best = clash; f = c; }
+    }
+    keys(f).forEach(function(x){ used[x] = true; });
+    return {t:f.replace('P', p), tone:'grow', goal:true};
+  });
+  // the teacher's own goals go where they are in the list
+  out.slice().reverse().forEach(function(o){ res.splice(o.at, 0, o); });
+  return res;
+}
+/* Turns "{They} read[s]…" into "{They} also read[s]…", "I encourage…" into "I also encourage…". */
+function withAlso(t){
+  var m = t.match(/^\{They\} (\{is\}|\{has\}|would|should|can|will) /);
+  if(m) return t.replace(m[0], '{They} '+m[1]+' also ');
+  if(/^\{They\} /.test(t)) return t.replace(/^\{They\} /, '{They} also ');
+  if(/^I encourage /.test(t)) return t.replace(/^I encourage /, 'I also encourage ');
+  return null;
+}
+function lowerStart(t){ return /^\{/.test(t) ? '{'+t.charAt(1).toLowerCase()+t.slice(2) : /^I\b/.test(t) ? t : t.charAt(0).toLowerCase()+t.slice(1); }
+function wordsIn(t){ return (t.match(/\S+/g)||[]).length; }
+/* Links a section's sentences so they don't all sit side by side: "also", "In addition,", "That said,",
+   and once per section a praise followed by a goal becomes one sentence ("While she …, she would benefit …").
+   Varied by student, so a class doesn't all read alike. The teacher's own sentences are left as typed. */
+function linkItems(items, st, sec, hasLead){
+  var h = hashOf(st.id+sec.id), adds = 0, last = '';
+  // First pass: one praise + goal pair becomes a single sentence.
+  for(var i=1; i<items.length; i++){
+    var p = items[i-1], q = items[i];
+    if(p.tone==='pos' && q.tone==='grow' && !q.goal && (i>1 || !hasLead) && /^\{They\} /.test(p.t) && /^(\{They\} would benefit|I encourage) /.test(q.t)
+       && wordsIn(p.t)+wordsIn(q.t) <= 38){
+      p.t = 'While {they} ' + p.t.replace(/^\{They\} /, '').replace(/[.!]$/, '') + ', ' + lowerStart(q.t);
+      p.tone = 'grow'; items.splice(i, 1);
+      break;
+    }
+  }
+  // Second pass: a transition where the next sentence adds to, turns from, or builds on the one before.
+  var ADD = ['also', 'also', 'In addition, '];
+  for(i=1; i<items.length; i++){
+    var prev = items[i-1], it = items[i];
+    if(it.goal || prev.tone==='own' || it.tone==='own' || /^While /.test(it.t)) continue;
+    var a = prev.tone==='prog' ? 'pos' : prev.tone, b = it.tone, pre = null;
+    if(b==='prog') pre = null;
+    else if(b==='next') pre = a==='next' ? 'also' : ['As a next step, ', 'To keep growing, '][h%2];
+    else if(a==='pos' && b==='grow') pre = last==='That said, ' ? 'At the same time, ' : 'That said, ';
+    else if((a==='grow' || a==='next') && b==='pos') pre = last==='At the same time, ' ? null : 'At the same time, ';
+    else if(a===b){
+      pre = /^\{Their\} reading of /.test(it.t) ? 'In particular, ' : ADD[(h+adds)%ADD.length];
+      if(pre===last) pre = 'also';
+      adds++;
+    }
+    last = pre || '';
+    if(!pre) continue;
+    if(pre==='also'){ var t = withAlso(it.t); it.t = t || 'In addition, ' + lowerStart(it.t); }
+    else it.t = pre + lowerStart(it.t);
+  }
+  return items;
+}
 /* The sentences of one section, in order: its rubric rows, its other questions, then the teacher's own sentence. */
 function sectionTemplates(sec, st){
   var out=[];
-  sec.sents.forEach(function(sent){ if(!sent.after){ var f=fillSentence(sent, st); if(f) out.push(f); } });
-  if(sec.rubric) critsFor(sec.rubric, st).forEach(function(c){ var f=critSentence(c, st); if(f) out.push(f); });
-  sec.sents.forEach(function(sent){ if(sent.after){ var f=fillSentence(sent, st); if(f) out.push(f); } });
-  var ex=(st.extra[sec.id]||'').trim(); if(ex) out.push(ex);
-  if(sec.rubric && out.length && /^\{They\} /.test(out[0])) out[0] = RUBRIC[sec.rubric].lead + '{they} ' + out[0].slice(7);
-  return out;
+  sec.sents.forEach(function(sent){ if(!sent.after){ var f=fillSentence(sent, st); if(f) out.push({t:f, tone:sentTone(sent, st)}); } });
+  if(sec.rubric) critsFor(sec.rubric, st).forEach(function(c){ var f=critSentence(c, st); if(f) out.push({t:f, tone:critTone(c, st)}); });
+  sec.sents.forEach(function(sent){ if(sent.after){ var f=fillSentence(sent, st); if(f) out.push({t:f, tone:sentTone(sent, st)}); } });
+  if(sec.goals) out = out.concat(goalItems(st));
+  var ex=(st.extra[sec.id]||'').trim(); if(ex) out.push({t:ex, tone:'own'});
+  var lead = sec.rubric && out.length && /^\{They\} /.test(out[0].t);
+  if(state.settings.link) linkItems(out, st, sec, lead);
+  if(lead) out[0].t = RUBRIC[sec.rubric].lead + '{they} ' + out[0].t.slice(7);
+  return out.map(function(o){ return o.t; });
 }
 function narrative(st){
   if(st.override!=null) return {text:st.override};
-  var R = makeResolver(st), paras = {1:[], 2:[]}, closing = [];
+  var R = makeResolver(st), paras = [], breaks = state.settings.breaks || {};
   sectionsFor(st).forEach(function(sec){
     R.reset();
     var lines = sectionTemplates(sec, st).map(function(t){ return tidy(R.run(t)); });
-    if(sec.para==='last') closing = closing.concat(lines); else paras[sec.para] = paras[sec.para].concat(lines);
+    if(!lines.length) return;
+    if(!paras.length || breaks[sec.id]) paras.push([]);
+    paras[paras.length-1] = paras[paras.length-1].concat(lines);
   });
-  var out = [paras[1].join(' '), paras[2].join(' ')].filter(Boolean);
-  if(closing.length){ if(out.length) out[out.length-1] += ' ' + closing.join(' '); else out.push(closing.join(' ')); }
-  return {text: out.join('\n\n')};
+  return {text: paras.map(function(p){ return p.join(' '); }).join('\n\n')};
 }
 function wc(t){ return (t.trim().match(/\S+/g)||[]).length; }
 function status(st){
@@ -692,11 +858,17 @@ function renderSections(){
     renderPreview(); renderList();
   };
   sectionsFor(st).forEach(function(sec, n){
+    if(n>0) box.appendChild(breakToggle(sec));
     var d = document.createElement('section'); d.className='sec sec-'+sec.id;
     var h = document.createElement('h2');
-    h.innerHTML = '<span class="secnum">'+(n+1)+'</span>'+esc(sec.title)+(sec.para===2?'<small>its own paragraph</small>':'');
+    h.innerHTML = '<span class="secnum">'+(n+1)+'</span>'+esc(sec.title);
     d.appendChild(h);
     if(sec.id==='sw') d.appendChild(w9Bar(st, onChange));
+    if(sec.goals){
+      var gl = document.createElement('div'); gl.className='rub goals';
+      GOALS.forEach(function(g){ gl.appendChild(goalRow(g, st, onChange)); });
+      d.appendChild(gl);
+    }
     if(sec.rubric){
       var rub = document.createElement('div'); rub.className='rub';
       critsFor(sec.rubric, st).forEach(function(c){ rub.appendChild(rubricRow(c, st, onChange)); });
@@ -719,6 +891,53 @@ function renderSections(){
     box.appendChild(d);
     requestAnimationFrame(grow);
   });
+}
+/* Between two sections: whether the second starts a new paragraph (for every student). */
+function breakToggle(sec){
+  var on = !!(state.settings.breaks||{})[sec.id];
+  var d = document.createElement('div'); d.className='brk';
+  var seg = document.createElement('span'); seg.className='seg';
+  [[false,'Same paragraph'],[true,'New paragraph']].forEach(function(o){
+    var b = document.createElement('button'); b.type='button'; b.textContent=o[1]; if(on===o[0]) b.className='on';
+    b.title = o[0] ? sec.title+' starts a new paragraph, in every student’s narrative' : sec.title+' runs on in the paragraph before it, in every student’s narrative';
+    b.onclick = function(){
+      state.settings.breaks = state.settings.breaks || {};
+      state.settings.breaks[sec.id] = o[0];
+      touchAll(); var y=$('builder').scrollTop; renderAll(); $('builder').scrollTop=y;
+    };
+    seg.appendChild(b);
+  });
+  d.appendChild(seg);
+  return d;
+}
+/* One To Work On goal: Add it, then pick its wording or write your own. */
+function goalRow(g, st, onChange){
+  var key = 'g_'+g.id, on = !!st.sel[key];
+  var row = document.createElement('div'); row.className='rrow'+(on?' answered':'');
+  var head = document.createElement('div'); head.className='rhead';
+  head.innerHTML = '<span class="rlabel">'+esc(g.label)+'</span>';
+  var b = document.createElement('button'); b.type='button'; b.className='gadd'+(on?' on':''); b.textContent = on ? '✓ Added' : '+ Add';
+  b.title = on ? 'Take this goal out of the narrative' : 'Add this goal to the narrative';
+  b.onclick = function(){ if(on) clearQ(st, key); else st.sel[key] = g.opts[hashOf(st.id+key)%g.opts.length]; onChange(true); };
+  head.appendChild(b);
+  row.appendChild(head);
+  if(on){
+    var line = document.createElement('div'); line.className='rsent';
+    var sel = document.createElement('select');
+    sel.innerHTML = g.opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(cap(resolve(o, st)))+'</option>'; }).join('')
+      + '<option value="__custom">✎ write my own sentence…</option>';
+    sel.value = st.sel[key];
+    sel.onchange = function(){ st.sel[key] = sel.value; onChange(true); };
+    line.appendChild(sel);
+    if(st.sel[key]==='__custom'){
+      var ta = document.createElement('textarea'); ta.rows=2; ta.placeholder='Write this sentence yourself';
+      ta.value = st.custom[key]||'';
+      ta.oninput = function(){ st.custom[key]=ta.value; onChange(false); };
+      line.appendChild(ta);
+    }
+    row.appendChild(line);
+  }
+  return row;
 }
 function w9Bar(st, onChange){
   var bar = document.createElement('div'); bar.className='w9bar';
@@ -791,6 +1010,7 @@ $('fGoes').oninput = function(){ var st=cur(); st.goesBy=this.value; touch(st); 
 $('fGrade').onchange = function(){ var st=cur(); st.grade=this.value; touch(st); renderAll(); };
 $('fPron').onchange = function(){ var st=cur(); st.pronouns=this.value; touch(st); renderAll(); };
 $('termSel').onchange = function(){ state.settings.term=this.value; touchAll(); renderAll(); };
+$('linkChk').onchange = function(){ state.settings.link=this.checked; touchAll(); renderAll(); };
 var secTimer; function debounceSections(){ clearTimeout(secTimer); secTimer=setTimeout(renderSections, 500); }
 
 $('delBtn').onclick = function(){
@@ -917,7 +1137,7 @@ $('bkRestore').onclick = function(){
     var d = JSON.parse($('bkText').value);
     if(!d || !Array.isArray(d.students)) throw 0;
     state.students.forEach(function(s){ removed.add(s.id); });
-    state = {settings:d.settings||{term:'semester'}, students:d.students.map(upgrade), currentId:(d.students[0]||{}).id||null};
+    state = {settings:defaultSettings(d.settings), students:d.students.map(upgrade), currentId:(d.students[0]||{}).id||null};
     state.students.forEach(function(s){ removed.delete(s.id); dirty.add(s.id); });
     $('bkDlg').close(); touch(null); renderAll(); toast('Restored '+state.students.length+' students');
   }catch(e){ toast('That backup could not be read'); }
@@ -982,11 +1202,12 @@ function upgrade(s){
 }
 function boot(d){
   if(d){
-    state.settings = Object.assign({term:'semester'}, d.settings||{});
+    state.settings = defaultSettings(d.settings);
     state.students = (d.students||[]).map(upgrade);
     state.currentId = d.currentId && state.students.some(function(s){return s.id===d.currentId;}) ? d.currentId : (state.students[0]||{}).id || null;
   }
   $('termSel').value = state.settings.term;
+  $('linkChk').checked = !!state.settings.link;
   renderAll();
 }
 if(isGAS){
