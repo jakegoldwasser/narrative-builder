@@ -111,6 +111,11 @@
   .gadd{flex:none;border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 12px;font-size:12px;color:var(--muted)}
   .gadd.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .goals .rrow{padding:5px 0}
+  .pickrow{display:flex;gap:6px;align-items:center}
+  .pickrow select{flex:1;min-width:0}
+  .edbtn{flex:none;border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;color:var(--accent);white-space:nowrap}
+  .edbtn:hover{border-color:var(--accent)}
+  .edbtn.quiet{color:var(--muted)}
   .goals .rlabel{flex:0 0 260px}
   .guessbtn{border:0;background:#fbf1dc;color:var(--amber);border-radius:5px;padding:0 6px;font:600 10px var(--sans);letter-spacing:.04em;text-transform:none;margin-left:4px}
   .guessbtn:hover{background:#f4e2b8}
@@ -289,7 +294,7 @@ var UPPER = ['10','11','12'];
 
 /* Rubric rows. opts[level] = sentences for that level (the first is offered by default); opts.next = extra stretch goals. */
 var RUBRIC = {
-  read:{lead:'As a reader, ', crit:[
+  read:{lead:'As a reader, ', skip:/\bread/i, crit:[
     {id:'r_depth', label:'Depth of reading', desc:'Deep, contemplative, imaginative reading that goes beyond plot', opts:{
       3:['{They} read[s] with real depth and imagination, often noticing how small choices of language open up larger meanings.','{They} bring[s] a deep, contemplative, and imaginative reading to every text we study.'],
       2:['{They} read[s] thoughtfully and thoroughly, looking beyond plot to how a text is written.'],
@@ -311,7 +316,7 @@ var RUBRIC = {
       1:['{They} would benefit from writing down questions when a passage is difficult and bringing them to class.','{They} {is} growing more confident with challenging texts.'],
       next:['{They} would benefit from bringing more of the questions written down while reading into our discussions.']}}
   ]},
-  write:{lead:'As a writer, ', crit:[
+  write:{lead:'As a writer, ', skip:/\bwrit/i, crit:[
     {id:'w9_courage', g:['9'], label:'Courage & imagination', desc:'Courageous, imaginative writing; poignant, surprising work', opts:{
       3:['{They} write[s] with courage and imagination, producing poignant, surprising work.'],
       2:['{They} take[s] thoughtful creative risks in {their} writing.'],
@@ -358,7 +363,7 @@ var RUBRIC = {
       1:['{They} would benefit from proofreading carefully and following MLA conventions.','{They} {is} becoming more careful with grammar and citation.'],
       next:['{They} would benefit from proofreading for the small errors that occasionally distract from {their} ideas.']}}
   ]},
-  part:{lead:'In class, ', crit:[
+  part:{lead:'In class, ', skip:/\bclass\b/i, crit:[
     {id:'p_discuss', label:'Discussion', desc:'Offers ideas and questions without prompting; ties comments to quotes from the text', opts:{
       3:['{They} offer[s] insightful ideas and questions without prompting, grounding {their} comments in the text.','{They} make[s] regular contributions that show an in-depth understanding of the material and challenge conventional interpretations.'],
       2:['{They} contribute[s] thoughtful comments that show a thorough reading of the text.'],
@@ -498,10 +503,84 @@ var DEFAULT_BREAKS = {sw:true, towork:true};
 function defaultSettings(s){
   var d = Object.assign({term:'semester', link:true}, s||{});
   d.breaks = Object.assign({}, DEFAULT_BREAKS, d.breaks||{});
+  d.mine = d.mine || {};
   return d;
 }
 function sectionsFor(st){ return SECTIONS.filter(function(s){ return !s.grades || s.grades.indexOf(st.grade)>-1; }); }
 
+/* ---------------- Your wordings ----------------
+ * Any answer can be edited. The edit is kept as a wording of that question for every student
+ * (settings.mine[key]: [{t, level}], as a template with {they}/{their}… in place of this student's name
+ * and pronouns), listed first in its dropdown and used first for students marked or added after it.
+ */
+function mineFor(key){ return ((state.settings.mine||{})[key]) || []; }
+function latestMine(key, level){
+  var m = mineFor(key).filter(function(x){ return level==null || x.level==null || x.level===level; });
+  return m.length ? m[m.length-1].t : null;
+}
+var MODALS = /^(would|could|should|can|will|might|must|may|also|often|always|still|now|consistently|regularly|sometimes|really|truly|already|never|rarely|\w+ly)$/i;
+var OBJ_NEXT = /^(to|and|a|an|the|in|with|for|on|at|as|this|that|how|what|when|why|into|from|about|through|so|or|but|more|again|well|too|be|is|are|feel)$/i;
+function templatize(text, st){
+  var nm = nameOf(st), pr = st.pronouns, toks = text.match(/[A-Za-z]+(?:[’'][A-Za-z]+)?|[^A-Za-z]+/g) || [];
+  var words = []; toks.forEach(function(t, i){ if(/^[A-Za-z]/.test(t)) words.push(i); });
+  var verbFrom = null; // 'sing' after she/he/the name, 'plur' after they
+  var tok = function(k, up){ return '{'+(up ? cap(k) : k)+'}'; };
+  var nextWord = function(i){ var j = words.indexOf(i); return j>-1 && j+1<words.length ? toks[words[j+1]] : ''; };
+  var startAt = function(i){ var before = toks.slice(0, i).join(''); return !/[A-Za-z]/.test(before) || /[.!?:]\s*["“]?\s*$/.test(before); };
+  words.forEach(function(i){
+    var w = toks[i], lw = w.toLowerCase(), up = /^[A-Z]/.test(w), out = null;
+    if(verbFrom){
+      if(MODALS.test(w)){ if(!/^(also|often|always|still|now|consistently|regularly|sometimes|really|truly|already|never|rarely|\w+ly)$/i.test(w)) verbFrom = null; return; }
+      var sing = verbFrom==='sing'; verbFrom = null;
+      if(sing){
+        if(/^(is|has|was|does)$/.test(lw)) out = '{'+lw+'}';
+        else if(/(sh|ch|x|ss|z|o)es$/.test(lw)) out = w.slice(0,-2)+'[es]';
+        else if(/[^su]s$/.test(lw) && !/ies$/.test(lw)) out = w.slice(0,-1)+'[s]';
+      } else {
+        var m = {are:'{is}', have:'{has}', were:'{was}', do:'{does}'}[lw];
+        if(m) out = m;
+        else if(!/ed$/.test(lw)) out = /(sh|ch|x|ss|z|o)$/.test(lw) ? w+'[es]' : w+'[s]';
+      }
+      if(out) toks[i] = out;
+      return;
+    }
+    var start = startAt(i);
+    if(w===nm+'’s' || w===nm+"'s") out = tok('their', start);
+    else if(w===nm){ if(start){ out = tok('they', true); verbFrom = 'sing'; } else out = tok('them', false); }
+    else if(pr==='she' || pr==='he'){
+      var me = pr==='she' ? {sub:'she', obj:'her', pos:'her', abs:'hers', ref:'herself'} : {sub:'he', obj:'him', pos:'his', abs:'his', ref:'himself'};
+      if(lw===me.sub){ out = tok('they', up); verbFrom = 'sing'; }
+      else if(lw===me.ref) out = tok('themself', up);
+      else if(pr==='she' && lw==='hers') out = tok('theirs', up);
+      else if(lw===me.obj && lw===me.pos){ var nx = nextWord(i); out = tok(!nx || OBJ_NEXT.test(nx) || /^[.,;:!?)]/.test(toks[i+1]||'.') ? 'them' : 'their', up); }
+      else if(lw===me.obj) out = tok('them', up);
+      else if(lw===me.pos) out = tok(/^[.,;:!?)]/.test(toks[i+1]||'.') ? 'theirs' : 'their', up);
+    } else if(pr==='they'){
+      if(lw==='they'){ out = tok('they', up); verbFrom = 'plur'; }
+      else if(lw==='them') out = tok('them', up);
+      else if(lw==='their') out = tok('their', up);
+      else if(lw==='theirs') out = tok('theirs', up);
+      else if(lw==='themself' || lw==='themselves') out = tok('themself', up);
+    }
+    if(out) toks[i] = out;
+  });
+  return toks.join('');
+}
+/* Keeps an edited answer as a wording for everyone. This student keeps exactly what was typed. */
+function saveWording(st, key, text, level){
+  text = (text||'').trim();
+  if(!text) return;
+  var tpl = templatize(text, st);
+  var builtin = SLOTS[key] ? SLOTS[key].opts : key.indexOf('g_')===0 ? goalById(key.slice(2)).opts : [].concat.apply([], [3,2,1,'next'].map(function(l){ return critById(key).opts[l]; }));
+  if(builtin.indexOf(tpl)<0){
+    var list = state.settings.mine[key] = mineFor(key).filter(function(x){ return x.t!==tpl; });
+    list.push({t:tpl, level:level==null ? null : level});
+  }
+  if(resolve(tpl, st).replace(/\s+/g,' ')===resolve(text, st).replace(/\s+/g,' ') || key.indexOf('g_')===0){ st.sel[key] = tpl; delete st.custom[key]; }
+  else { st.sel[key] = '__custom'; st.custom[key] = text; } // the guess at pronouns didn't round-trip: keep their words as typed
+  delete st.auto[key];
+}
+function forgetWording(key, tpl){ state.settings.mine[key] = mineFor(key).filter(function(x){ return x.t!==tpl; }); }
 function hashOf(str){ var h=0; for(var i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))|0; } return Math.abs(h); }
 /* Marking a level fills that row's sentence (the level's sentences, varied by student so a class doesn't
    all read alike), unless the teacher has picked or written that row's sentence by hand. */
@@ -511,7 +590,7 @@ function rate(st, c, level){
   if(was===level){ clearQ(st, c.id); return; }
   st.rub[c.id] = level;
   if(!mine){
-    var arr = c.opts[level]; var v = arr[hashOf(st.id+c.id)%arr.length];
+    var arr = c.opts[level]; var v = latestMine(c.id, level) || arr[hashOf(st.id+c.id)%arr.length];
     st.sel[c.id] = v; st.auto[c.id] = v;
   }
 }
@@ -552,7 +631,7 @@ function nameOf(st){ return (st.goesBy||'').trim() || firstName(st.name) || 'Stu
 function pieceOf(st){ return st.w9.piece === '__custom' ? (st.w9.pieceCustom||'piece') : st.w9.piece; }
 /* A resolver keeps track of whether the student has been named yet: in each section the first mention is
    the name (with singular verbs), later ones the pronouns. With "Always use their name", every mention is
-   the name, and a second possessive in one sentence reads "the" (never "Maya ... Maya's"). */
+   the name (possessives too: "Ari’s growth"). */
 function makeResolver(st){
   var nm = nameOf(st), p = PRON[st.pronouns] || PRON.they, nameOnly = st.pronouns==='name';
   var r = {mentioned:false, named:false};
@@ -576,7 +655,7 @@ function makeResolver(st){
         return fix(p[lower]);
       }
       if(lower==='their' || lower==='theirs'){
-        if(nameOnly){ if(seenHere) return fix('the'); seenHere=true; r.mentioned=true; return nm+'’s'; }
+        if(nameOnly){ seenHere=true; r.mentioned=true; return nm+'’s'; }
         if(!r.mentioned){ r.mentioned=true; seenHere=true; return nm+'’s'; }
         return fix(p[lower]);
       }
@@ -595,7 +674,7 @@ function quoteFmt(t){
   return t;
 }
 /* A choice with a default (def) shows it until the teacher picks another or "— leave out —". */
-function choiceOf(key, st){ var s = SLOTS[key], v = st.sel[key]; return v===undefined && s.def!=null ? s.opts[s.def] : v; }
+function choiceOf(key, st){ var s = SLOTS[key], v = st.sel[key]; return v===undefined && s.def!=null ? (latestMine(key) || s.opts[s.def]) : v; }
 /* returns the filled template, or null when unanswered (left out of the narrative) */
 function slotValue(key, st){
   var s = SLOTS[key];
@@ -642,7 +721,14 @@ function goalItems(st){
   GOALS.forEach(function(g){
     var v = st.sel['g_'+g.id];
     if(!v) return;
-    if(v==='__custom'){ var t=(st.custom['g_'+g.id]||'').trim(); if(t) out.push({t:t, tone:'own', at:phrases.length}); return; }
+    if(v==='__custom'){
+      var t=(st.custom['g_'+g.id]||'').trim();
+      if(!t) return;
+      // a goal being edited is a phrase ("reading each assignment twice"); an older one written as a whole sentence stays one
+      if(/^[A-Z][^]*[.!?]$/.test(t) && /\s/.test(t) && !/^[A-Z][a-z]+ing\b/.test(t)) out.push({t:t, tone:'own', at:phrases.length});
+      else phrases.push(t.replace(/[.]$/, ''));
+      return;
+    }
     phrases.push(v);
   });
   // Two short goals share a sentence ("from A and from B"); a long one has its own.
@@ -709,7 +795,8 @@ function sectionTemplates(sec, st){
   sec.sents.forEach(function(sent){ if(sent.after){ var f=fillSentence(sent, st); if(f) out.push({t:f, tone:sentTone(sent, st)}); } });
   if(sec.goals) out = out.concat(goalItems(st));
   var ex=(st.extra[sec.id]||'').trim(); if(ex) out.push({t:ex, tone:'own'});
-  var lead = sec.rubric && out.length && /^\{They\} /.test(out[0].t);
+  // "As a reader," leads a section, unless its first sentence already reads, writes or is about class
+  var lead = sec.rubric && out.length && /^\{They\} /.test(out[0].t) && !RUBRIC[sec.rubric].skip.test(out[0].t.split(/[.;]/)[0]);
   if(state.settings.link) linkItems(out, st, sec, lead);
   if(lead) out[0].t = RUBRIC[sec.rubric].lead + '{they} ' + out[0].t.slice(7);
   return out.map(function(o){ return o.t; });
@@ -766,21 +853,15 @@ function xButton(title, fn){
   b.onclick=fn; return b;
 }
 function choiceControl(key, st, onChange){
-  var s = SLOTS[key], v = choiceOf(key, st);
+  var s = SLOTS[key], v = choiceOf(key, st), same = function(t){ return t; };
   var frag = document.createDocumentFragment();
   var sel = document.createElement('select');
-  var html = '<option value="">— leave out —</option>';
-  s.opts.forEach(function(o,i){ html += '<option value="'+i+'">'+esc(resolve(o, st))+'</option>'; });
-  html += '<option value="__custom">✎ write my own…</option>';
-  sel.innerHTML = html;
-  var idx = s.opts.indexOf(v);
-  sel.value = v==='__custom' ? '__custom' : idx>-1 ? String(idx) : '';
+  sel.innerHTML = optionsHtml(key, st, [[null, s.opts]], same).replace('✎ edit this wording…', '✎ edit / write my own…');
+  sel.value = v==null ? '' : v;
   sel.className = sel.value==='' ? 'none' : '';
   sel.onchange = function(){
-    var x = sel.value;
-    st.sel[key] = x==='' ? '' : x==='__custom' ? x : s.opts[+x];
+    if(sel.value==='__custom') startEdit(st, key, same); else st.sel[key] = sel.value;
     onChange(true);
-    if(x==='__custom') setTimeout(function(){ var inp=document.querySelector('[data-custom="'+key+'"]'); if(inp) inp.focus(); });
   };
   frag.appendChild(sel);
   if(v==='__custom'){
@@ -788,11 +869,56 @@ function choiceControl(key, st, onChange){
     var inp = document.createElement('input');
     inp.dataset.custom = key; inp.value = st.custom[key]||''; inp.placeholder='type your words';
     inp.oninput = function(){ st.custom[key]=inp.value; fit(inp); onChange(false); };
+    inp.onchange = function(){ saveWording(st, key, inp.value); onChange(true); };
     frag.appendChild(inp);
     requestAnimationFrame(function(){ fit(inp); });
   }
   requestAnimationFrame(function(){ fit(sel); });
   return frag;
+}
+function optionsHtml(key, st, groups, fmt){
+  var seen = {}, html = '<option value="">— leave out —</option>';
+  var opt = function(o){ seen[o] = 1; return '<option value="'+esc(o)+'">'+esc(fmt(resolve(o, st)))+'</option>'; };
+  var mine = mineFor(key).map(function(x){ return x.t; }).reverse();
+  if(mine.length) html += '<optgroup label="Your wording">' + mine.map(opt).join('') + '</optgroup>';
+  groups.forEach(function(g){ var o = g[1].filter(function(x){ return !seen[x]; }); if(o.length) html += (g[0] ? '<optgroup label="'+esc(g[0])+'">' : '') + o.map(opt).join('') + (g[0] ? '</optgroup>' : ''); });
+  var v = st.sel[key];
+  if(v && v!=='__custom' && !seen[v]) html += opt(v);
+  return html + '<option value="__custom">✎ edit this wording…</option>';
+}
+/* Editing an answer starts from its words as they read now. */
+function startEdit(st, key, fmt){
+  var v = SLOTS[key] ? choiceOf(key, st) : st.sel[key];
+  if(v!=='__custom'){ st.custom[key] = v ? fmt(resolve(v, st)) : ''; st.sel[key] = '__custom'; }
+  setTimeout(function(){ var el = document.querySelector('[data-custom="'+key+'"]'); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+}
+function editTools(st, key, onChange, fmt, level){
+  var frag = document.createDocumentFragment();
+  var v = st.sel[key];
+  var b = document.createElement('button'); b.type='button'; b.className='edbtn';
+  if(v==='__custom'){
+    b.textContent = 'Save wording'; b.title = 'Keep these words, and offer them first for every student from now on';
+    b.onmousedown = function(e){ e.preventDefault(); };
+    b.onclick = function(){ saveWording(st, key, st.custom[key], level); onChange(true); toast('Saved: offered first for every student'); };
+  } else {
+    b.textContent = '✎ Edit'; b.title = 'Change these words. Your version is kept and offered first for every student.';
+    b.onclick = function(){ startEdit(st, key, fmt); onChange(true); };
+  }
+  frag.appendChild(b);
+  if(v && v!=='__custom' && mineFor(key).some(function(x){ return x.t===v; })){
+    var f = document.createElement('button'); f.type='button'; f.className='edbtn quiet'; f.textContent='Remove from list';
+    f.title = 'Stop offering this wording (students who have it keep it)';
+    f.onclick = function(){ forgetWording(key, v); touchAll(); onChange(true); };
+    frag.appendChild(f);
+  }
+  return frag;
+}
+function editBox(st, key, onChange, level, ph){
+  var ta = document.createElement('textarea'); ta.rows=2; ta.placeholder=ph; ta.dataset.custom = key;
+  ta.value = st.custom[key]||'';
+  ta.oninput = function(){ st.custom[key]=ta.value; onChange(false); };
+  ta.onchange = function(){ saveWording(st, key, ta.value, level); onChange(true); };
+  return ta;
 }
 function textControl(key, st, onChange){
   var s = SLOTS[key];
@@ -837,27 +963,20 @@ function rubricRow(c, st, onChange){
   row.appendChild(head);
   if(st.sel[c.id]){
     var line = document.createElement('div'); line.className='rsent';
+    var same = function(t){ return t; };
+    var pick = document.createElement('div'); pick.className='pickrow';
     var sel = document.createElement('select');
-    var html = '<option value="">— leave out —</option>';
-    [3,2,1,'next'].forEach(function(l){
-      html += '<optgroup label="'+LEVEL_GROUP[l]+'">';
-      c.opts[l].forEach(function(o){ html += '<option value="'+esc(o)+'">'+esc(resolve(o, st))+'</option>'; });
-      html += '</optgroup>';
-    });
-    html += '<option value="__custom">✎ write my own…</option>';
-    sel.innerHTML = html; sel.value = st.sel[c.id];
+    sel.innerHTML = optionsHtml(c.id, st, [3,2,1,'next'].map(function(l){ return [LEVEL_GROUP[l], c.opts[l]]; }), same);
+    sel.value = st.sel[c.id];
     sel.onchange = function(){
       if(!sel.value){ clearQ(st, c.id); }
+      else if(sel.value==='__custom') startEdit(st, c.id, same);
       else { st.sel[c.id] = sel.value; delete st.auto[c.id]; }
       onChange(true);
     };
-    line.appendChild(sel);
-    if(st.sel[c.id]==='__custom'){
-      var ta = document.createElement('textarea'); ta.rows=2; ta.placeholder='Write this sentence yourself';
-      ta.value = st.custom[c.id]||'';
-      ta.oninput = function(){ st.custom[c.id]=ta.value; onChange(false); };
-      line.appendChild(ta);
-    }
+    pick.appendChild(sel); pick.appendChild(editTools(st, c.id, onChange, same, st.rub[c.id]));
+    line.appendChild(pick);
+    if(st.sel[c.id]==='__custom') line.appendChild(editBox(st, c.id, onChange, st.rub[c.id], 'Write this sentence your way'));
     row.appendChild(line);
   }
   return row;
@@ -932,21 +1051,20 @@ function goalRow(g, st, onChange){
   head.innerHTML = '<span class="rlabel">'+esc(g.label)+'</span>';
   var b = document.createElement('button'); b.type='button'; b.className='gadd'+(on?' on':''); b.textContent = on ? '✓ Added' : '+ Add';
   b.title = on ? 'Take this goal out of the narrative' : 'Add this goal to the narrative';
-  b.onclick = function(){ if(on) clearQ(st, key); else st.sel[key] = g.opts[hashOf(st.id+key)%g.opts.length]; onChange(true); };
+  b.onclick = function(){ if(on) clearQ(st, key); else st.sel[key] = latestMine(key) || g.opts[hashOf(st.id+key)%g.opts.length]; onChange(true); };
   head.appendChild(b);
   row.appendChild(head);
   if(on){
     var line = document.createElement('div'); line.className='rsent';
+    var pick = document.createElement('div'); pick.className='pickrow';
     var sel = document.createElement('select');
-    sel.innerHTML = g.opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(cap(resolve(o, st)))+'</option>'; }).join('')
-      + '<option value="__custom">✎ write my own sentence…</option>';
+    sel.innerHTML = optionsHtml(key, st, [[null, g.opts]], cap).replace('<option value="">— leave out —</option>', '');
     sel.value = st.sel[key];
-    sel.onchange = function(){ st.sel[key] = sel.value; onChange(true); };
-    line.appendChild(sel);
+    sel.onchange = function(){ if(sel.value==='__custom') startEdit(st, key, function(t){ return t; }); else st.sel[key] = sel.value; onChange(true); };
+    pick.appendChild(sel); pick.appendChild(editTools(st, key, onChange, function(t){ return t; }));
+    line.appendChild(pick);
     if(st.sel[key]==='__custom'){
-      var ta = document.createElement('textarea'); ta.rows=2; ta.placeholder='Write this sentence yourself';
-      ta.value = st.custom[key]||'';
-      ta.oninput = function(){ st.custom[key]=ta.value; onChange(false); };
+      var ta = editBox(st, key, onChange, null, 'what they would benefit from, e.g. “reading each assignment twice”');
       line.appendChild(ta);
     }
     row.appendChild(line);

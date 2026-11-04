@@ -28,6 +28,8 @@ Copy the name column from your Google Sheet, plus the grade and pronoun columns 
 
 ## 3. Write
 - **Only what you mark goes in.** Each rubric row you mark (Exceptionally well / Proficient / Room for growth) adds its own sentence, in the order of the rows; its dropdown swaps the wording, offers next steps, or lets you write your own. A row you don't mark, a dropdown left on “— leave out —” and an empty box add nothing. A sentence you picked or wrote yourself stays put if you change that row's level.
+- **Edit any answer:** **✎ Edit** beside a sentence (or "✎ edit this wording…" in its dropdown) opens it with its words as they read now. When you click away or press **Save wording**, your version is kept for the whole class: listed first under "Your wording" in that dropdown, with the student's name and pronouns swapped for each student, and used first for students you mark at that level (or add that goal for, or for the Closing) from then on. **Remove from list** stops offering one. If a pronoun can't be worked out, that student keeps exactly what you typed.
+- **No "As a reader, she reads":** "As a reader," / "As a writer," / "In class," are left off when the first sentence already says read, write or class.
 - **Clearing:** every question has a × (or “— leave out —”), and **Clear sheet** (click twice) clears everything for the student.
 - **Too long?** Past 200 words the meter turns red and a note says how far over; nothing is ever cut for you.
 - **Sections:** Opening, Reading, Writing, Class Participation, Student Writing (grade 9), To Work On and Closing. The Closing starts on “I look forward to seeing her continued growth as a reader and writer.” (choose another, or “— leave out —”); a sheet with only that isn’t counted as started.
