@@ -14,16 +14,29 @@ function onOpen() {
   try { PropertiesService.getScriptProperties().setProperty('DOC_ID', DocumentApp.getActiveDocument().getId()); } catch (e) {}
 }
 
+/* The builder always opens as its latest version, fetched from GitHub Pages, so updates reach this doc
+   without pasting anything in again. If that can't be reached, the Index file here is used instead. */
+var PAGE_URL = 'https://jakegoldwasser.github.io/narrative-builder/index.html';
+
+function builderHtml_() {
+  try {
+    var res = UrlFetchApp.fetch(PAGE_URL + '?t=' + Date.now(), { muteHttpExceptions: true });
+    var text = res.getResponseCode() === 200 ? res.getContentText() : '';
+    if (text.indexOf('Narrative Builder') !== -1) return HtmlService.createHtmlOutput(text);
+  } catch (e) {}
+  return HtmlService.createHtmlOutputFromFile('Index');
+}
+
 /** Opens the builder in a large window over the doc. */
 function openBuilder() {
   PropertiesService.getScriptProperties().setProperty('DOC_ID', DocumentApp.getActiveDocument().getId());
-  var html = HtmlService.createHtmlOutputFromFile('Index').setWidth(1400).setHeight(900);
+  var html = builderHtml_().setWidth(1400).setHeight(900);
   DocumentApp.getUi().showModelessDialog(html, 'Narrative Builder');
 }
 
 /** Lets you also run it full-screen in its own tab (Deploy → New deployment → Web app). */
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
+  return builderHtml_()
     .setTitle('Narrative Builder')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }

@@ -13,7 +13,11 @@ Files: `src/index.html` (edit this), `index.html` (built by `node build.js`, whi
 4. Click **＋ → HTML**, name the file `Index` (no extension), and paste in the contents of **index.html** from this repository.
 5. Click **Save** 💾 and close the Apps Script tab.
 6. Reload the doc. A **Narratives** menu appears. Choose **Narratives → Open Narrative Builder**.
-7. The first time, Google asks you to authorize the script. Choose your account, then **Advanced → Go to (project) → Allow**. It's your own script and only touches this doc.
+7. The first time, Google asks you to authorize the script. Choose your account, then **Advanced → Go to (project) → Allow**. It's your own script: it only touches this doc, and it fetches the builder's latest version from GitHub Pages ("connect to an external service").
+
+**Updates arrive on their own.** Each time you open the builder from the doc, it loads its latest version from GitHub Pages, so you never paste in `index.html` again (the `Index` file is only used if GitHub can't be reached). Only a change to `Code.gs` needs pasting in.
+
+**Moving work from the GitHub Pages site into the doc:** the two keep separate copies. On the site, click **Backup → Copy**; in the doc's builder, click **Backup**, paste, and click **Restore from pasted** (this replaces what's in the doc's builder).
 
 Every change saves automatically, about 2 seconds after you stop typing (the top bar reads "Saved to Google Doc · 8:42 AM", and **Open the Google Doc ↗** beside it opens the doc in a new tab). Earlier versions of the doc are in its **File › Version history**. The doc is rewritten each time with every student's heading, narrative and word count. Make your edits in the builder: anything typed directly into the doc gets overwritten.
 
