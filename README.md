@@ -15,7 +15,7 @@ Files: `src/index.html` (edit this), `index.html` (built by `node build.js`, whi
 6. Reload the doc. A **Narratives** menu appears. Choose **Narratives → Open Narrative Builder**.
 7. The first time, Google asks you to authorize the script. Choose your account, then **Advanced → Go to (project) → Allow**. It's your own script and only touches this doc.
 
-Every change saves automatically, about 2 seconds after you stop typing (the top bar reads "Saved to Google Doc · 8:42 AM"). The doc is rewritten each time with every student's heading, narrative and word count. Make your edits in the builder: anything typed directly into the doc gets overwritten.
+Every change saves automatically, about 2 seconds after you stop typing (the top bar reads "Saved to Google Doc · 8:42 AM", and **Open the Google Doc ↗** beside it opens the doc in a new tab). Earlier versions of the doc are in its **File › Version history**. The doc is rewritten each time with every student's heading, narrative and word count. Make your edits in the builder: anything typed directly into the doc gets overwritten.
 
 **Optional, for a full browser tab instead of a pop-up window:** in Apps Script choose **Deploy → New deployment → Web app**. Set Execute as **Me** and Who has access **Only myself**, then bookmark the URL. Open the builder from the doc menu once first so it knows which doc to use.
 

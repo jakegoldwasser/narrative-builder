@@ -28,6 +28,7 @@
   .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
   .btn.ghost{border-color:transparent;background:none;color:var(--muted)}
   .btn.danger{color:var(--warn)}
+  a.btn.doclink{color:var(--accent);text-decoration:none;font-size:13px}
   label.inline{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
   label.inline select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:#fff;color:var(--ink)}
 
@@ -176,6 +177,7 @@
   <label class="inline" title="Join the sentences with transitions (also, that said, while…) so they don't all sit side by side. Your own sentences are never changed."><input type="checkbox" id="linkChk"> Link sentences</label>
   <div class="spacer"></div>
   <span class="status" id="status">Loading…</span>
+  <a class="btn doclink" id="docLink" target="_blank" rel="noopener" hidden title="Opens the Google Doc where every narrative is saved, in a new tab. It's rewritten from the builder a few seconds after each change; earlier versions are in the doc's File › Version history.">Open the Google Doc ↗</a>
   <button class="btn" id="vcBtn">Send to Veracross</button>
   <button class="btn ghost" id="backupBtn">Backup</button>
 </header>
@@ -1223,6 +1225,7 @@ function boot(d){
 }
 if(isGAS){
   $('modeLabel').textContent = 'saving to your Google Doc';
+  google.script.run.withSuccessHandler(function(url){ if(url){ $('docLink').href = url; $('docLink').hidden = false; } }).getDocUrl();
   google.script.run
     .withSuccessHandler(function(json){ boot(json?JSON.parse(json):null); setStatus('All changes saved'); })
     .withFailureHandler(function(e){ setStatus('Couldn’t load: '+(e&&e.message||e), true); boot(null); })

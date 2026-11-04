@@ -35,6 +35,11 @@ function getDoc_() {
   return DocumentApp.openById(id);
 }
 
+/** The narratives doc's address, for the builder's "Open the Google Doc" link. */
+function getDocUrl() {
+  return getDoc_().getUrl();
+}
+
 /** Returns everything saved so far as a JSON string. */
 function loadState() {
   var props = PropertiesService.getScriptProperties().getProperties();
