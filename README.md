@@ -15,7 +15,13 @@ Files: `src/index.html` (edit this), `index.html` (built by `node build.js`, whi
 6. Reload the doc. A **Narratives** menu appears. Choose **Narratives → Open Narrative Builder**.
 7. The first time, Google asks you to authorize the script. Choose your account, then **Advanced → Go to (project) → Allow**. It's your own script: it only touches this doc, and it fetches the builder's latest version from GitHub Pages ("connect to an external service").
 
-**Switching computers:** your work is kept with the doc's script in your Google account, so opening the builder from the doc on any computer shows the same students. Two windows open at once can't undo each other: each student is saved only over an older copy of themselves (the newer one is kept and shown), a student is deleted only by Remove student, saved wordings from both are kept, and a window that comes back into use (or every minute) loads what the other one saved.
+**Where your work is kept, and why it can't be lost:** in the doc version, everything is saved to a file in your Google Drive, `Narrative Builder data.json`, in a folder called **Narrative Builder data** beside the doc, so the builder on any computer shows the same students.
+- **Backups:** every hour you work, and always just before a student is removed or a backup restored, a full copy goes into that folder's **Backups** folder (up to 500; older ones go to Drive's trash, which keeps them 30 more days). To use one, open it, copy its text, and paste it into **Backup → Restore from pasted**. Drive also keeps earlier versions of the data file itself.
+- **Removing a student never deletes them:** they go to **Recently removed** (at the foot of the student list), where **Put back** returns them with everything you wrote. Restoring a backup sets the current students aside there too.
+- **Undo:** **Clear sheet** and **Back to builder** (which now takes two clicks) both offer Undo for 12 seconds.
+- **Two windows at once:** a student is saved only over the copy that window started from. If another window changed that student meanwhile, its copy is kept and this window's version goes to Recently removed as "(version from another window)", so neither edit is lost. A student leaves the list only by Remove student. Saved wordings from both windows are kept. A window that comes back into use (or every minute) loads what the other one saved.
+- **If loading fails,** the builder says so and saves nothing, rather than opening empty.
+- **Before November 2026** work was kept in the script's own storage, which holds only about 75 students; it's copied into the Drive file the first time, and the old copy is left as it was.
 
 **Updates arrive on their own.** Each time you open the builder from the doc, it loads its latest version from GitHub Pages, so you never paste in `index.html` again (the `Index` file is only used if GitHub can't be reached). Only a change to `Code.gs` needs pasting in.
 

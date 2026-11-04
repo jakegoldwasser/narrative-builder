@@ -158,6 +158,9 @@
   ol.steps{padding-left:20px;line-height:1.6;margin:8px 0}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
   .toast.on{opacity:1}
+  .toast.act{pointer-events:auto}
+  .toast button{margin-left:12px;border:0;border-radius:6px;background:#fff;color:var(--ink);padding:3px 10px;font-weight:600}
+  .loadfail{max-width:520px;margin:80px auto;padding:18px 20px;border:1px solid #e7b8b3;background:#fbe9e7;color:var(--warn);border-radius:12px;font-size:15px;line-height:1.5}
 
   @media (max-width:1050px){
     .app{grid-template-columns:200px minmax(0,1fr)}
@@ -195,6 +198,7 @@
       <button class="btn primary" id="pasteBtn">Paste roster</button>
       <button class="btn" id="addBtn">+ One</button>
       <button class="btn ghost" id="sortBtn" title="Sort by last name">A–Z</button>
+      <button class="btn ghost" id="trashBtn" hidden title="Students you removed, kept so you can put them back">Recently removed</button>
     </div>
   </aside>
 
@@ -261,9 +265,17 @@
   <div class="actions"><button class="btn" onclick="vcDlg.close()">Close</button><button class="btn primary" id="vcCopy">Copy narratives</button></div>
 </div></dialog>
 
+<dialog id="trashDlg"><div class="dlg">
+  <h2>Recently Removed</h2>
+  <p>Removing a student never deletes them. Put anyone back here, with everything you wrote for them.</p>
+  <div class="pastePv" id="trashList"></div>
+  <div class="actions"><button class="btn" onclick="trashDlg.close()">Close</button></div>
+</div></dialog>
+
 <dialog id="bkDlg"><div class="dlg">
   <h2>Backup</h2>
-  <p>This is everything in the builder. Copy it somewhere safe, or paste a backup here and click Restore.</p>
+  <p>This is everything in the builder. Copy it somewhere safe, or paste a backup here and click Restore. Restoring sets the students here now aside under Recently removed; it doesn't delete them.</p>
+  <p id="bkAuto" hidden>A full backup is also saved to your Drive every hour you work (and just before any student is removed or a backup restored): <a id="bkAutoLink" target="_blank" rel="noopener">open the Backups folder ↗</a>. Open one, copy its text, paste it here and click Restore.</p>
   <textarea id="bkText" style="min-height:200px"></textarea>
   <div class="actions"><button class="btn" onclick="bkDlg.close()">Close</button><button class="btn" id="bkCopy">Copy</button><button class="btn danger" id="bkRestore">Restore from pasted</button></div>
 </div></dialog>
@@ -1131,7 +1143,7 @@ function renderHeader(){
   $('fName').value = st.name; $('fGoes').value = st.goesBy; $('fGrade').value = st.grade; $('fPron').value = st.pronouns;
   $('pronOk').hidden = !st.pronGuess;
 }
-function renderAll(){ renderHeader(); renderList(); renderSections(); renderPreview(); }
+function renderAll(){ renderHeader(); renderList(); renderSections(); renderPreview(); renderTrash(); }
 
 /* ---------------- Events ---------------- */
 function fillGrades(sel, def){ sel.innerHTML = GRADES.map(function(g){return '<option value="'+g+'">'+g+'</option>';}).join(''); sel.value=def; }
@@ -1162,15 +1174,20 @@ $('delBtn').onclick = function(){
   btn.dataset.armed=''; btn.textContent='Remove student';
   var i = state.students.indexOf(st);
   state.students.splice(i,1); removed.add(st.id);
+  if(!isGAS) (state.trash = state.trash || []).unshift({id:st.id, name:st.name, removedAt:Date.now(), student:st});
+  else { trashCache.unshift({id:st.id, name:st.name, removedAt:Date.now()}); }
   state.currentId = (state.students[i]||state.students[i-1]||{}).id || null;
   touch(null); renderAll();
+  toast('Removed '+(st.name||'student')+'. They’re under Recently removed.', function(){ restoreStudent(st.id); });
 };
 $('clearBtn').onclick = function(){
   var st=cur(); if(!st) return;
   var btn=this;
   if(btn.dataset.armed!=='1'){ btn.dataset.armed='1'; btn.textContent='Click again to clear everything'; btn.classList.add('danger'); setTimeout(function(){btn.dataset.armed='';btn.textContent='Clear sheet';btn.classList.remove('danger');},3000); return; }
   btn.dataset.armed=''; btn.textContent='Clear sheet'; btn.classList.remove('danger');
-  clearSheet(st); touch(st); renderAll(); toast('Cleared '+nameOf(st)+'\u2019s sheet');
+  var before = JSON.stringify(st);
+  clearSheet(st); touch(st); renderAll();
+  toast('Cleared '+nameOf(st)+'\u2019s sheet', function(){ putBack(before); });
 };
 $('addBtn').onclick = function(){
   var last = cur();
@@ -1182,12 +1199,25 @@ $('sortBtn').onclick = function(){
   state.students.sort(function(a,b){ return last(a.name).localeCompare(last(b.name)); });
   touch(null); renderList(); toast('Sorted by last name');
 };
+/* Undo: puts one student back exactly as they were. */
+function putBack(json){
+  var was = upgrade(JSON.parse(json)), i = state.students.findIndex(function(s){ return s.id===was.id; });
+  if(i<0) return;
+  state.students[i] = was; state.currentId = was.id; touch(was); renderAll(); toast('Put back as it was');
+}
 function step(d){ var i = state.students.indexOf(cur()); var n = state.students[i+d]; if(n) select(n.id); }
 $('prevBtn').onclick = function(){ step(-1); };
 $('nextBtn').onclick = function(){ step(1); };
 $('copyBtn').onclick = function(){ var st=cur(); if(st) copyText(narrative(st).text, 'Narrative copied'); };
 $('ovText').oninput = function(){ var st=cur(); if(!st) return; var was = st.override!=null; st.override=this.value; touch(st); renderPreview(); renderList(); if(!was) toast('Edited by hand. Back to builder undoes it.'); };
-$('ovRevert').onclick = function(){ var st=cur(); st.override=null; touch(st); renderAll(); };
+$('ovRevert').onclick = function(){
+  var st=cur(), btn=this;
+  if(btn.dataset.armed!=='1'){ btn.dataset.armed='1'; btn.textContent='Click again to drop your hand edits'; setTimeout(function(){ btn.dataset.armed=''; btn.textContent='Back to builder'; },3000); return; }
+  btn.dataset.armed=''; btn.textContent='Back to builder';
+  var before = JSON.stringify(st);
+  st.override=null; touch(st); renderAll();
+  toast('Your hand edits are set aside', function(){ putBack(before); });
+};
 
 /* ---------------- Roster paste ---------------- */
 function openPaste(){ $('pasteIn').value=''; $('pastePv').innerHTML='<span style="color:var(--muted)">Preview appears here.</span>'; $('pasteDlg').showModal(); $('pasteIn').focus(); }
@@ -1271,16 +1301,55 @@ $('vcOnlyDone').onchange = vcRefresh;
 $('vcCopy').onclick = function(){ vcRefresh(); copyText($('vcOut').value, 'Copied — now click Fill Veracross in Veracross', $('vcOut')); };
 $('bmLink').href = 'javascript:' + encodeURIComponent("(function () {\nvar AUTO_SAVE = false;\nvar SAVE_TEXT = /^\\s*save(\\s+(all|comments?|narratives?|changes))?\\s*$/i;\nvar FIELD_LABEL = null;\nvar old = document.getElementById('nb-vc-panel'); if (old) old.remove();\nfunction norm(s) {\nreturn (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n.replace(/[^a-z' -]/g, ' ').replace(/['-]/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction words(s) { return ' ' + norm(s) + ' '; }\nfunction has(hay, w) { return w && hay.indexOf(' ' + w + ' ') !== -1; }\nfunction panel(html) {\nvar p = document.getElementById('nb-vc-panel');\nif (!p) {\np = document.createElement('div'); p.id = 'nb-vc-panel';\np.style.cssText = 'position:fixed;z-index:2147483647;top:16px;right:16px;width:360px;max-height:80vh;overflow:auto;' +\n'background:#fff;color:#1d2a2e;border:1px solid #c9d3d4;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.2);' +\n'font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;padding:14px 16px';\ndocument.body.appendChild(p);\n}\np.innerHTML = '<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px\">' +\n'<strong style=\"font-size:15px\">Narrative Filler</strong>' +\n'<button id=\"nb-vc-x\" style=\"border:0;background:none;font-size:20px;cursor:pointer\">×</button></div>' + html;\np.querySelector('#nb-vc-x').onclick = function () { p.remove(); };\nreturn p;\n}\nfunction start() {\nvar p = panel('<p style=\"margin:0 0 8px\">Paste the narratives you copied from Narrative Builder:</p>' +\n'<textarea id=\"nb-vc-in\" style=\"width:100%;height:110px;box-sizing:border-box;font:12px monospace\"></textarea>' +\n'<button id=\"nb-vc-go\" style=\"margin-top:8px;background:#1d5c63;color:#fff;border:0;border-radius:6px;padding:8px 14px;cursor:pointer\">Fill comment boxes</button>');\nvar ta = p.querySelector('#nb-vc-in'); ta.focus();\nif (navigator.clipboard && navigator.clipboard.readText) {\nnavigator.clipboard.readText().then(function (t) { if (t && t.indexOf('\"narrative\"') !== -1) ta.value = t; }).catch(function () {});\n}\np.querySelector('#nb-vc-go').onclick = function () { run(ta.value); };\n}\nfunction allDocs() {\nvar docs = [document];\n(function walk(d) {\nvar frames = d.querySelectorAll('iframe,frame');\nfor (var i = 0; i < frames.length; i++) {\ntry { var cd = frames[i].contentDocument; if (cd && docs.indexOf(cd) === -1) { docs.push(cd); walk(cd); } } catch (e) {}\n}\n})(document);\nreturn docs;\n}\nfunction visible(el) {\nvar r = el.getBoundingClientRect(); var cs = el.ownerDocument.defaultView.getComputedStyle(el);\nreturn (r.width > 0 || r.height > 0) && cs.visibility !== 'hidden' && cs.display !== 'none';\n}\nfunction fieldText(el) { return el.isContentEditable ? (el.innerText || '') : ''; }\nfunction setValue(el, text) {\nvar win = el.ownerDocument.defaultView;\nif (el.isContentEditable) {\nel.focus();\nvar ok = false;\ntry { el.ownerDocument.execCommand('selectAll', false, null); ok = el.ownerDocument.execCommand('insertText', false, text); } catch (e) {}\nif (!ok || norm(el.innerText) !== norm(text)) { el.innerText = text; }\nel.dispatchEvent(new win.Event('input', { bubbles: true }));\n} else {\nvar proto = el.tagName === 'TEXTAREA' ? win.HTMLTextAreaElement.prototype : win.HTMLInputElement.prototype;\nvar setter = Object.getOwnPropertyDescriptor(proto, 'value').set;\nel.focus(); setter.call(el, text);\nel.dispatchEvent(new win.Event('input', { bubbles: true }));\nel.dispatchEvent(new win.Event('change', { bubbles: true }));\n}\nel.dispatchEvent(new win.Event('blur', { bubbles: true }));\nel.style.outline = '3px solid #2e9e6a'; el.style.outlineOffset = '1px';\n}\nfunction run(raw) {\nvar data;\ntry { data = JSON.parse(raw); } catch (e) { panel('<p style=\"color:#b3261e\">That didn\\'t look like the copied narratives. Go back to Narrative Builder, click <b>Copy for Veracross</b>, and try again.</p>'); return; }\nvar list = Array.isArray(data) ? data : (data.students || []);\nvar students = list.map(function (s) {\nvar toks = norm(s.name).split(' ').filter(function (t) { return t.length > 1; });\nreturn { s: s, first: toks[0], last: toks[toks.length - 1], alt: norm(s.goesBy || ''), field: null, ambiguous: false };\n}).filter(function (x) { return x.first && x.s.narrative; });\nfunction matches(hay) {\nreturn students.filter(function (x) {\nreturn has(hay, x.last) && (has(hay, x.first) || (x.alt && has(hay, x.alt)));\n});\n}\nvar fields = [];\nallDocs().forEach(function (d) {\nvar els = d.querySelectorAll('textarea, [contenteditable=\"\"], [contenteditable=\"true\"]');\nfor (var i = 0; i < els.length; i++) {\nvar el = els[i];\nif (el.readOnly || el.disabled || !visible(el) || el.closest('#nb-vc-panel')) continue;\nif (el.isContentEditable && el.parentElement && el.parentElement.isContentEditable) continue;\nfields.push(el);\n}\n});\nfields.forEach(function (el) {\nvar own = norm(fieldText(el));\nvar node = el.parentElement;\nfor (var depth = 0; node && depth < 10; depth++, node = node.parentElement) {\nvar hay = words(norm(node.innerText || '').replace(own, ' '));\nvar m = matches(hay);\nif (m.length === 1) {\nif (FIELD_LABEL && !FIELD_LABEL.test(node.innerText || '')) break;\nif (!m[0].field) m[0].field = el; else m[0].ambiguous = true;\nbreak;\n}\nif (m.length > 1) break;\n}\n});\nvar filled = [], missing = [], multi = [];\nstudents.forEach(function (x) {\nif (!x.field) { missing.push(x.s.name); return; }\nsetValue(x.field, x.s.narrative);\nfilled.push(x.s.name);\nif (x.ambiguous) multi.push(x.s.name);\n});\nvar html = '<p style=\"margin:0 0 6px\"><b style=\"color:#2e7d55\">Filled ' + filled.length + '</b> of ' + students.length + ' narratives (outlined in green).</p>';\nif (missing.length) html += '<p style=\"margin:6px 0\"><b style=\"color:#b3261e\">Couldn\\'t find a box for:</b><br>' + missing.join('<br>') + '</p>';\nif (multi.length) html += '<p style=\"margin:6px 0\"><b style=\"color:#9a6400\">More than one box matched (filled the first):</b><br>' + multi.join('<br>') + '</p>';\nif (!fields.length) html += '<p style=\"color:#b3261e\">No comment boxes were found on this page. Open the page where you type the comments for the class, then run this again.</p>';\nif (AUTO_SAVE && filled.length) {\nvar btn = null;\nallDocs().some(function (d) {\nvar bs = d.querySelectorAll('button, input[type=submit], input[type=button], a');\nfor (var i = 0; i < bs.length; i++) { var t = bs[i].innerText || bs[i].value || ''; if (SAVE_TEXT.test(t) && visible(bs[i])) { btn = bs[i]; return true; } }\n});\nif (btn) { btn.click(); html += '<p>Clicked <b>' + (btn.innerText || btn.value) + '</b>.</p>'; }\nelse html += '<p style=\"color:#9a6400\">Couldn\\'t find a Save button — please click it yourself.</p>';\n} else {\nhtml += '<p style=\"margin-top:8px\">Review the filled comments, then click Veracross\\'s <b>Save</b> button.</p>';\n}\npanel(html);\n}\nstart();\n})();");
 
+/* ---------------- Recently removed ---------------- */
+var trashCache = []; // the doc's list, as the server last sent it
+function trashItems(){ return isGAS ? trashCache : (state.trash || []); }
+function renderTrash(){
+  var items = trashItems();
+  $('trashBtn').hidden = !items.length;
+  $('trashBtn').textContent = 'Recently removed (' + items.length + ')';
+  $('trashList').innerHTML = items.length ? '' : '<span style="color:var(--muted)">No one.</span>';
+  items.forEach(function(t){
+    var row = document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:10px;padding:4px 0';
+    row.innerHTML = '<span style="flex:1">'+esc(t.name||'(no name)')+' <span style="color:var(--muted);font-size:12px">removed '+new Date(t.removedAt).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})+'</span></span>';
+    var b = document.createElement('button'); b.className='btn'; b.textContent='Put back'; b.onclick=function(){ restoreStudent(t.id); };
+    row.appendChild(b); $('trashList').appendChild(row);
+  });
+}
+function restoreStudent(id){
+  if(!isGAS){
+    var t = (state.trash||[]).find(function(x){ return x.id===id; }); if(!t) return;
+    state.trash = state.trash.filter(function(x){ return x!==t; });
+    var s = upgrade(t.student); state.students.push(s); state.currentId = s.id; removed.delete(id);
+    touch(s); renderAll(); renderTrash(); toast('Put back '+(s.name||'student')); return;
+  }
+  var go = function(){
+    google.script.run.withSuccessHandler(function(json){
+      var d = JSON.parse(json); boot(d); lastRev = d.rev; trashCache = d.trash || [];
+      if(state.students.some(function(s){ return s.id===id; })) { state.currentId = id; renderAll(); }
+      renderTrash(); toast('Put back');
+    }).withFailureHandler(function(e){ toast('Couldn’t put them back: '+(e&&e.message||e)); }).restoreRemoved(id);
+  };
+  if(saving || dirty.size || removed.size){ clearTimeout(saveT); flush(); setTimeout(function wait(){ if(saving || dirty.size || removed.size) setTimeout(wait, 400); else go(); }, 400); }
+  else go();
+}
+$('trashBtn').onclick = function(){ renderTrash(); $('trashDlg').showModal(); };
+
 /* ---------------- Backup ---------------- */
-$('backupBtn').onclick = function(){ $('bkText').value = JSON.stringify(state, null, 1); $('bkDlg').showModal(); };
+$('backupBtn').onclick = function(){
+  $('bkText').value = JSON.stringify(state, null, 1); $('bkDlg').showModal();
+  if(isGAS) google.script.run.withSuccessHandler(function(url){ if(url){ $('bkAutoLink').href = url; $('bkAuto').hidden = false; } }).getBackupsUrl();
+};
 $('bkCopy').onclick = function(){ copyText($('bkText').value, 'Backup copied', $('bkText')); };
 $('bkRestore').onclick = function(){
   try{
     var d = JSON.parse($('bkText').value);
     if(!d || !Array.isArray(d.students)) throw 0;
-    state.students.forEach(function(s){ removed.add(s.id); });
-    state = {settings:defaultSettings(d.settings), students:d.students.map(upgrade), currentId:(d.students[0]||{}).id||null};
-    state.students.forEach(function(s){ removed.delete(s.id); dirty.add(s.id); s.at = Date.now(); }); // a restore replaces what's saved
+    var oldTrash = state.trash || [];
+    state.students.forEach(function(s){ removed.add(s.id); if(!isGAS) oldTrash.unshift({id:s.id, name:s.name, removedAt:Date.now(), student:s}); });
+    state = {settings:defaultSettings(d.settings), students:d.students.map(upgrade), currentId:(d.students[0]||{}).id||null, trash:oldTrash};
+    restoring = true;
+    state.students.forEach(function(s){ removed.delete(s.id); dirty.add(s.id); s.at = Date.now(); s.baseAt = 1e15; }); // a restore replaces what's saved
     state.settings.at = Date.now();
     $('bkDlg').close(); touch(null); renderAll(); toast('Restored '+state.students.length+' students');
   }catch(e){ toast('That backup could not be read'); }
@@ -1300,10 +1369,14 @@ function copyText(text, msg, fallbackEl){
     navigator.clipboard.writeText(text).then(function(){ toast(msg); }, legacy);
   } else legacy();
 }
-var toastT; function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on');},2600); }
+var toastT; function toast(m, undo){
+  var t=$('toast'); t.textContent=m; t.classList.add('on'); t.classList.toggle('act', !!undo);
+  if(undo){ var b=document.createElement('button'); b.type='button'; b.textContent='Undo'; b.onclick=function(){ t.classList.remove('on'); undo(); }; t.appendChild(b); }
+  clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on');}, undo ? 12000 : 2600);
+}
 
 /* ---------------- Saving ---------------- */
-var dirty = new Set(), removed = new Set(), saving=false, saveT=null, lastErr=false;
+var dirty = new Set(), removed = new Set(), saving=false, saveT=null, lastErr=false, loaded=!isGAS, restoring=false;
 function setStatus(t, err){ var s=$('status'); s.textContent=t; s.className='status'+(err?' err':''); }
 function touch(st){ if(st){ dirty.add(st.id); st.at = Date.now(); } setStatus('Saving…'); clearTimeout(saveT); saveT=setTimeout(flush, isGAS?1800:300); }
 function touchAll(){ state.settings.at = Date.now(); state.students.forEach(function(s){dirty.add(s.id);}); touch(null); }
@@ -1314,6 +1387,7 @@ function flush(){
     catch(e){ setStatus('Not saved — use Backup', true); }
     dirty.clear(); removed.clear(); return;
   }
+  if(!loaded) return; // never save a window that didn't load what's in the doc
   if(saving){ clearTimeout(saveT); saveT=setTimeout(flush, 800); return; }
   saving=true;
   var ids=Array.from(dirty), rem=Array.from(removed); dirty.clear(); removed.clear();
@@ -1322,21 +1396,27 @@ function flush(){
     order: state.students.map(function(s){return s.id;}),
     students: ids.map(function(id){ return state.students.find(function(s){return s.id===id;}); }).filter(Boolean),
     removed: rem,
+    restored: restoring,
     rows: {}
   };
+  var wasRestoring = restoring; restoring = false;
+  var sentAt = {}; payload.students.forEach(function(s){ sentAt[s.id] = s.at || 0; });
   state.students.forEach(function(s){ var x=status(s); payload.rows[s.id] = {name:s.name, grade:s.grade, text:x.n.text, words:x.w, state:x.cls, at:s.at||0}; });
   google.script.run
     .withSuccessHandler(function(res){
       saving=false; setStatus('Saved to Google Doc · '+hhmm());
       var r = {}; try{ r = JSON.parse(res); }catch(e){}
       if(r.rev) lastRev = r.rev;
+      if(r.trash){ trashCache = r.trash; renderTrash(); }
+      // what this window now knows the saved copy to be (so a later save can tell if someone else changed it)
+      ids.forEach(function(id){ if((r.kept||[]).indexOf(id)<0){ var x = state.students.find(function(s){ return s.id===id; }); if(x && sentAt[id]!=null) x.baseAt = sentAt[id]; } });
       if(r.kept && r.kept.length){
         var names = r.kept.map(function(id){ var x = state.students.find(function(s){ return s.id===id; }); return x ? nameOf(x) : ''; }).filter(Boolean);
-        reloadFromDoc('Another window had newer work for '+names.join(', ')+', so that was kept and is shown here.');
+        reloadFromDoc('Another window saved newer work for '+names.join(', ')+'. That is shown here; if this window had changed them too, its version is under Recently removed.');
       }
     })
     .withFailureHandler(function(err){
-      saving=false; ids.forEach(function(i){dirty.add(i);}); rem.forEach(function(i){removed.add(i);});
+      saving=false; ids.forEach(function(i){dirty.add(i);}); rem.forEach(function(i){removed.add(i);}); if(wasRestoring) restoring = true;
       setStatus('Couldn’t save — retrying…', true); clearTimeout(saveT); saveT=setTimeout(flush, 5000);
     })
     .saveState(JSON.stringify(payload));
@@ -1349,7 +1429,7 @@ function reloadFromDoc(msg){
     if(dirty.size || removed.size || saving) return; // this window's own changes go first; the next check catches up
     var d = json ? JSON.parse(json) : null; if(!d) return;
     var id = state.currentId, y = $('builder').scrollTop;
-    boot(d); lastRev = d.rev || lastRev;
+    boot(d); lastRev = d.rev || lastRev; trashCache = d.trash || []; renderTrash();
     if(state.students.some(function(s){ return s.id===id; })){ state.currentId = id; renderAll(); }
     $('builder').scrollTop = y;
     toast(msg || 'Brought in changes saved from another window');
@@ -1385,13 +1465,17 @@ if(isGAS){
   $('modeLabel').textContent = 'saving to your Google Doc';
   google.script.run.withSuccessHandler(function(url){ if(url){ $('docLink').href = url; $('docLink').hidden = false; } }).getDocUrl();
   google.script.run
-    .withSuccessHandler(function(json){ var d = json?JSON.parse(json):null; boot(d); lastRev = d && d.rev || '0'; setStatus('All changes saved'); })
-    .withFailureHandler(function(e){ setStatus('Couldn’t load: '+(e&&e.message||e), true); boot(null); })
+    .withSuccessHandler(function(json){ var d = json?JSON.parse(json):null; loaded = true; boot(d); lastRev = d && d.rev || '0'; trashCache = d && d.trash || []; renderTrash(); setStatus('All changes saved'); })
+    .withFailureHandler(function(e){
+      // Never start empty: an empty window could look like lost work, or be typed into. Nothing has been changed.
+      setStatus('Couldn’t load', true);
+      document.querySelector('.app').innerHTML = '<div class="loadfail"><b>Couldn’t load your narratives.</b><br>Nothing has been changed or saved. Close this window and open it again from Narratives › Open Narrative Builder.<br><small>'+esc(e&&e.message||e)+'</small></div>';
+    })
     .loadState();
 } else {
   $('modeLabel').textContent = 'preview · saves in this browser only';
   var saved=null; try{ saved = JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
-  boot(saved); setStatus(saved ? 'Restored from this browser' : 'Ready');
+  boot(saved); if(saved && saved.trash) state.trash = saved.trash; renderTrash(); setStatus(saved ? 'Restored from this browser' : 'Ready');
 }
 </script>
 </body>
