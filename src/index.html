@@ -22,7 +22,7 @@
   .brand small{font-family:var(--sans);font-size:12px;color:var(--muted);font-weight:400;margin-left:6px}
   .top .spacer{flex:1}
   .status{font-size:12px;color:var(--muted)}
-  .status.err{color:var(--warn)}
+  .status.err{color:var(--warn);cursor:pointer;text-decoration:underline dotted}
   .btn{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:6px 11px}
   .btn:hover{border-color:#c9c1b2}
   .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -1518,7 +1518,7 @@ function flush(){
   state.students.forEach(function(s){ var x=status(s); payload.rows[s.id] = {name:s.name, grade:s.grade, text:x.n.text, words:x.w, state:x.cls, at:s.at||0}; });
   google.script.run
     .withSuccessHandler(function(res){
-      saving=false; setStatus('Saved to Google Doc · '+hhmm());
+      saving=false; setStatus('Saved to Google Doc · '+hhmm()); $('status').title=''; $('status').onclick=null;
       var r = {}; try{ r = JSON.parse(res); }catch(e){}
       if(r.rev) lastRev = r.rev;
       if(r.trash){ trashCache = r.trash; renderTrash(); }
@@ -1531,7 +1531,11 @@ function flush(){
     })
     .withFailureHandler(function(err){
       saving=false; ids.forEach(function(i){dirty.add(i);}); rem.forEach(function(i){removed.add(i);}); if(wasRestoring) restoring = true;
-      setStatus('Couldn’t save — retrying…', true); clearTimeout(saveT); saveT=setTimeout(flush, 5000);
+      var why = String(err && err.message || err || '');
+      setStatus('Couldn’t save — retrying…', true);
+      $('status').title = 'Google said: ' + why + '\nYour changes are still in this window. Click for details.';
+      $('status').onclick = function(){ alert('Couldn’t save to the doc. Google said:\n\n' + why + '\n\nYour changes are still in this window, and it keeps trying. To be safe, click Backup → Copy and paste it somewhere.'); };
+      clearTimeout(saveT); saveT=setTimeout(flush, 5000);
     })
     .saveState(JSON.stringify(payload));
 }
