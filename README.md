@@ -15,6 +15,8 @@ Files: `src/index.html` (edit this), `index.html` (built by `node build.js`, whi
 6. Reload the doc. A **Narratives** menu appears. Choose **Narratives → Open Narrative Builder**.
 7. The first time, Google asks you to authorize the script. Choose your account, then **Advanced → Go to (project) → Allow**. It's your own script: it only touches this doc, and it fetches the builder's latest version from GitHub Pages ("connect to an external service").
 
+**Switching computers:** your work is kept with the doc's script in your Google account, so opening the builder from the doc on any computer shows the same students. Two windows open at once can't undo each other: each student is saved only over an older copy of themselves (the newer one is kept and shown), a student is deleted only by Remove student, saved wordings from both are kept, and a window that comes back into use (or every minute) loads what the other one saved.
+
 **Updates arrive on their own.** Each time you open the builder from the doc, it loads its latest version from GitHub Pages, so you never paste in `index.html` again (the `Index` file is only used if GitHub can't be reached). Only a change to `Code.gs` needs pasting in.
 
 **Moving work from the GitHub Pages site into the doc:** the two keep separate copies. On the site, click **Backup → Copy**; in the doc's builder, click **Backup**, paste, and click **Restore from pasted** (this replaces what's in the doc's builder).

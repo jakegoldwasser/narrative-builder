@@ -575,12 +575,16 @@ function saveWording(st, key, text, level){
   if(builtin.indexOf(tpl)<0){
     var list = state.settings.mine[key] = mineFor(key).filter(function(x){ return x.t!==tpl; });
     list.push({t:tpl, level:level==null ? null : level});
+    state.settings.at = Date.now();
   }
   if(resolve(tpl, st).replace(/\s+/g,' ')===resolve(text, st).replace(/\s+/g,' ') || key.indexOf('g_')===0){ st.sel[key] = tpl; delete st.custom[key]; }
   else { st.sel[key] = '__custom'; st.custom[key] = text; } // the guess at pronouns didn't round-trip: keep their words as typed
   delete st.auto[key];
 }
-function forgetWording(key, tpl){ state.settings.mine[key] = mineFor(key).filter(function(x){ return x.t!==tpl; }); }
+function forgetWording(key, tpl){
+  state.settings.mine[key] = mineFor(key).filter(function(x){ return x.t!==tpl; });
+  (state.settings.mineGone = state.settings.mineGone || []).push({key:key, t:tpl}); // so another window's copy doesn't bring it back
+}
 function hashOf(str){ var h=0; for(var i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))|0; } return Math.abs(h); }
 /* Marking a level fills that row's sentence (the level's sentences, varied by student so a class doesn't
    all read alike), unless the teacher has picked or written that row's sentence by hand. */
@@ -1276,7 +1280,8 @@ $('bkRestore').onclick = function(){
     if(!d || !Array.isArray(d.students)) throw 0;
     state.students.forEach(function(s){ removed.add(s.id); });
     state = {settings:defaultSettings(d.settings), students:d.students.map(upgrade), currentId:(d.students[0]||{}).id||null};
-    state.students.forEach(function(s){ removed.delete(s.id); dirty.add(s.id); });
+    state.students.forEach(function(s){ removed.delete(s.id); dirty.add(s.id); s.at = Date.now(); }); // a restore replaces what's saved
+    state.settings.at = Date.now();
     $('bkDlg').close(); touch(null); renderAll(); toast('Restored '+state.students.length+' students');
   }catch(e){ toast('That backup could not be read'); }
 };
@@ -1300,8 +1305,8 @@ var toastT; function toast(m){ var t=$('toast'); t.textContent=m; t.classList.ad
 /* ---------------- Saving ---------------- */
 var dirty = new Set(), removed = new Set(), saving=false, saveT=null, lastErr=false;
 function setStatus(t, err){ var s=$('status'); s.textContent=t; s.className='status'+(err?' err':''); }
-function touch(st){ if(st) dirty.add(st.id); setStatus('Saving…'); clearTimeout(saveT); saveT=setTimeout(flush, isGAS?1800:300); }
-function touchAll(){ state.students.forEach(function(s){dirty.add(s.id);}); touch(null); }
+function touch(st){ if(st){ dirty.add(st.id); st.at = Date.now(); } setStatus('Saving…'); clearTimeout(saveT); saveT=setTimeout(flush, isGAS?1800:300); }
+function touchAll(){ state.settings.at = Date.now(); state.students.forEach(function(s){dirty.add(s.id);}); touch(null); }
 function hhmm(){ var d=new Date(); return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
 function flush(){
   if(!isGAS){
@@ -1317,16 +1322,44 @@ function flush(){
     order: state.students.map(function(s){return s.id;}),
     students: ids.map(function(id){ return state.students.find(function(s){return s.id===id;}); }).filter(Boolean),
     removed: rem,
-    doc: state.students.map(function(s){ var x=status(s); return {name:s.name, grade:s.grade, text:x.n.text, words:x.w, state:x.cls}; })
+    rows: {}
   };
+  state.students.forEach(function(s){ var x=status(s); payload.rows[s.id] = {name:s.name, grade:s.grade, text:x.n.text, words:x.w, state:x.cls, at:s.at||0}; });
   google.script.run
-    .withSuccessHandler(function(){ saving=false; setStatus('Saved to Google Doc · '+hhmm()); })
+    .withSuccessHandler(function(res){
+      saving=false; setStatus('Saved to Google Doc · '+hhmm());
+      var r = {}; try{ r = JSON.parse(res); }catch(e){}
+      if(r.rev) lastRev = r.rev;
+      if(r.kept && r.kept.length){
+        var names = r.kept.map(function(id){ var x = state.students.find(function(s){ return s.id===id; }); return x ? nameOf(x) : ''; }).filter(Boolean);
+        reloadFromDoc('Another window had newer work for '+names.join(', ')+', so that was kept and is shown here.');
+      }
+    })
     .withFailureHandler(function(err){
       saving=false; ids.forEach(function(i){dirty.add(i);}); rem.forEach(function(i){removed.add(i);});
       setStatus('Couldn’t save — retrying…', true); clearTimeout(saveT); saveT=setTimeout(flush, 5000);
     })
     .saveState(JSON.stringify(payload));
 }
+/* The builder open in another window, or on another computer, may have saved since this one loaded:
+   when this window comes back into use (and every minute), it loads those changes. */
+var lastRev = null;
+function reloadFromDoc(msg){
+  google.script.run.withSuccessHandler(function(json){
+    if(dirty.size || removed.size || saving) return; // this window's own changes go first; the next check catches up
+    var d = json ? JSON.parse(json) : null; if(!d) return;
+    var id = state.currentId, y = $('builder').scrollTop;
+    boot(d); lastRev = d.rev || lastRev;
+    if(state.students.some(function(s){ return s.id===id; })){ state.currentId = id; renderAll(); }
+    $('builder').scrollTop = y;
+    toast(msg || 'Brought in changes saved from another window');
+  }).loadState();
+}
+function checkForChanges(){
+  if(!isGAS || saving || dirty.size || removed.size || lastRev==null || document.hidden) return;
+  google.script.run.withSuccessHandler(function(rev){ if(rev && rev!==lastRev && !dirty.size && !saving) reloadFromDoc(); }).getRev();
+}
+if(isGAS){ window.addEventListener('focus', checkForChanges); document.addEventListener('visibilitychange', checkForChanges); setInterval(checkForChanges, 60000); }
 window.addEventListener('beforeunload', function(e){ if(isGAS && (dirty.size||removed.size||saving)){ e.preventDefault(); e.returnValue=''; } });
 
 function upgrade(s){
@@ -1352,7 +1385,7 @@ if(isGAS){
   $('modeLabel').textContent = 'saving to your Google Doc';
   google.script.run.withSuccessHandler(function(url){ if(url){ $('docLink').href = url; $('docLink').hidden = false; } }).getDocUrl();
   google.script.run
-    .withSuccessHandler(function(json){ boot(json?JSON.parse(json):null); setStatus('All changes saved'); })
+    .withSuccessHandler(function(json){ var d = json?JSON.parse(json):null; boot(d); lastRev = d && d.rev || '0'; setStatus('All changes saved'); })
     .withFailureHandler(function(e){ setStatus('Couldn’t load: '+(e&&e.message||e), true); boot(null); })
     .loadState();
 } else {
