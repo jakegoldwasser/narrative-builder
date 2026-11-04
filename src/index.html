@@ -158,6 +158,19 @@
   ol.steps{padding-left:20px;line-height:1.6;margin:8px 0}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
   .toast.on{opacity:1}
+  .rohint{font-size:12.5px;color:var(--muted);margin:0 0 8px}
+  #roList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+  #roList li{display:flex;gap:8px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-family:var(--serif);font-size:14.5px;line-height:1.4;cursor:grab;user-select:none}
+  #roList li.dragging{opacity:.35}
+  #roList li.over-before{box-shadow:0 -3px 0 var(--accent)}
+  #roList li.over-after{box-shadow:0 3px 0 var(--accent)}
+  #roList .grip{color:#b5ab9b;font-family:var(--sans);font-size:14px;line-height:1.4;flex:none}
+  #roList .rotext{flex:1;min-width:0}
+  #roList .rosec{display:block;font-family:var(--sans);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:1px}
+  #roList .romove{flex:none;display:flex;flex-direction:column;gap:2px}
+  #roList .romove button{border:1px solid var(--line);background:#fff;border-radius:4px;font-size:10px;line-height:1;padding:2px 5px;color:var(--muted)}
+  .roacts{margin-top:8px;text-align:right}
+  #roBtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
   .toast.act{pointer-events:auto}
   .toast button{margin-left:12px;border:0;border-radius:6px;background:#fff;color:var(--ink);padding:3px 10px;font-weight:600}
   .loadfail{max-width:520px;margin:80px auto;padding:18px 20px;border:1px solid #e7b8b3;background:#fbe9e7;color:var(--warn);border-radius:12px;font-size:15px;line-height:1.5}
@@ -226,10 +239,11 @@
   <aside class="preview">
     <div class="pv-head"><b>Narrative</b><span class="meter" id="meter">0 / 200 words</span></div>
     <div class="bar" id="bar"><i style="width:0"></i></div>
-    <div class="pv-body"><div id="pvText" hidden></div><textarea id="ovText" placeholder="Nothing yet. Only what you mark or choose goes into the narrative, or type it here yourself." title="Type here to edit the narrative by hand"></textarea><p id="overNote" class="overnote" hidden></p></div>
+    <div class="pv-body"><div id="pvText" hidden></div><div id="reorder" hidden><p class="rohint">Drag the sentences into the order you want, for this student only. They're joined up again in their new order.</p><ol id="roList"></ol><div class="roacts"><button class="btn ghost" id="roReset" hidden>Back to the usual order</button></div></div><textarea id="ovText" placeholder="Nothing yet. Only what you mark or choose goes into the narrative, or type it here yourself." title="Type here to edit the narrative by hand"></textarea><p id="overNote" class="overnote" hidden></p></div>
     <div class="pv-foot">
       <button class="btn" id="prevBtn">← Prev</button>
       <button class="btn" id="copyBtn">Copy</button>
+      <button class="btn" id="roBtn" title="Drag this student's sentences into a different order (this student only)">⇅ Reorder</button>
       <button class="btn" id="nextBtn">Next →</button>
     </div>
   </aside>
@@ -611,7 +625,7 @@ function rate(st, c, level){
   }
 }
 function clearQ(st, id){ delete st.rub[id]; delete st.sel[id]; delete st.auto[id]; delete st.custom[id]; delete st.text[id]; }
-function clearSheet(st){ st.rub={}; st.sel={}; st.auto={}; st.custom={}; st.text={}; st.extra={}; st.override=null; st.w9.mode='quote'; }
+function clearSheet(st){ st.sentOrder=null; st.rub={}; st.sel={}; st.auto={}; st.custom={}; st.text={}; st.extra={}; st.override=null; st.w9.mode='quote'; }
 
 /* ---------------- State ---------------- */
 var KEY = 'narrativeBuilder.v1';
@@ -741,7 +755,7 @@ function goalItems(st){
       var t=(st.custom['g_'+g.id]||'').trim();
       if(!t) return;
       // a goal being edited is a phrase ("reading each assignment twice"); an older one written as a whole sentence stays one
-      if(/^[A-Z][^]*[.!?]$/.test(t) && /\s/.test(t) && !/^[A-Z][a-z]+ing\b/.test(t)) out.push({t:t, tone:'own', at:phrases.length});
+      if(/^[A-Z][^]*[.!?]$/.test(t) && /\s/.test(t) && !/^[A-Z][a-z]+ing\b/.test(t)) out.push({t:t, tone:'own', at:phrases.length, key:'towork:'+g.id});
       else phrases.push(t.replace(/[.]$/, ''));
       return;
     }
@@ -758,7 +772,7 @@ function goalItems(st){
     var f = n===0 ? FRAMES[0] : FRAMES[1 + (n-1)%2];
     var t = f[0] + g[0] + (g[1] ? (/,/.test(g[0]) ? ', and ' : ' and ') + f[1] + g[1] : '') + '.';
     if(n>1 && n===groups.length-1) t = 'Finally, ' + lowerStart(t);
-    return {t:t, tone:'grow', goal:true, at:n};
+    return {t:t, tone:'grow', goal:true, at:n, key:'towork:'+n};
   });
   // the teacher's own goals go where they are in the list
   out.slice().reverse().forEach(function(o){
@@ -804,13 +818,37 @@ function linkItems(items, st, sec, hasLead){
   return items;
 }
 /* The sentences of one section, in order: its rubric rows, its other questions, then the teacher's own sentence. */
-function sectionTemplates(sec, st){
+/* The sentences of one section, in order: its other questions, its rubric rows, its after-questions, then
+   the teacher's own sentence. Each has a key, so a student's own order (st.sentOrder) can move it. */
+function sectionItems(sec, st){
   var out=[];
-  sec.sents.forEach(function(sent){ if(!sent.after){ var f=fillSentence(sent, st); if(f) out.push({t:f, tone:sentTone(sent, st)}); } });
-  if(sec.rubric) critsFor(sec.rubric, st).forEach(function(c){ var f=critSentence(c, st); if(f) out.push({t:f, tone:critTone(c, st)}); });
-  sec.sents.forEach(function(sent){ if(sent.after){ var f=fillSentence(sent, st); if(f) out.push({t:f, tone:sentTone(sent, st)}); } });
+  sec.sents.forEach(function(sent, i){ if(!sent.after){ var f=fillSentence(sent, st); if(f) out.push({t:f, tone:sentTone(sent, st), key:sec.id+':'+i}); } });
+  if(sec.rubric) critsFor(sec.rubric, st).forEach(function(c){ var f=critSentence(c, st); if(f) out.push({t:f, tone:critTone(c, st), key:c.id}); });
+  sec.sents.forEach(function(sent, i){ if(sent.after){ var f=fillSentence(sent, st); if(f) out.push({t:f, tone:sentTone(sent, st), key:sec.id+':'+i}); } });
   if(sec.goals) out = out.concat(goalItems(st));
-  var ex=(st.extra[sec.id]||'').trim(); if(ex) out.push({t:ex, tone:'own'});
+  var ex=(st.extra[sec.id]||'').trim(); if(ex) out.push({t:ex, tone:'own', key:'extra:'+sec.id});
+  out.forEach(function(o){ o.sec = sec; });
+  return out;
+}
+/* Every sentence of the narrative, in this student's order: the ones they've moved where they were put,
+   any new ones after the sentence they follow by default. (Only this student; never carried to others.) */
+function orderedItems(st){
+  var all = [].concat.apply([], sectionsFor(st).map(function(sec){ return sectionItems(sec, st); }));
+  var saved = st.sentOrder;
+  if(!saved || !saved.length) return all;
+  var byKey = {}; all.forEach(function(o){ byKey[o.key] = o; });
+  var keys = saved.filter(function(k){ return byKey[k]; });
+  all.forEach(function(o, i){
+    if(keys.indexOf(o.key)>-1) return;
+    var at = 0;
+    for(var j=i-1; j>=0; j--){ var p = keys.indexOf(all[j].key); if(p>-1){ at = p+1; break; } }
+    keys.splice(at, 0, o.key);
+  });
+  return keys.map(function(k){ return byKey[k]; });
+}
+/* A run of sentences from one section, linked and led ("As a reader,") as the section would be. */
+function runTemplates(run, st){
+  var sec = run[0].sec, out = run.map(function(o){ return {t:o.t, tone:o.tone, goal:o.goal}; });
   // "As a reader," leads a section, unless its first sentence already reads, writes or is about class
   var lead = sec.rubric && out.length && /^\{They\} /.test(out[0].t) && !RUBRIC[sec.rubric].skip.test(out[0].t.split(/[.;]/)[0]);
   if(state.settings.link) linkItems(out, st, sec, lead);
@@ -819,12 +857,15 @@ function sectionTemplates(sec, st){
 }
 function narrative(st){
   if(st.override!=null) return {text:st.override};
-  var R = makeResolver(st), paras = [], breaks = state.settings.breaks || {};
-  sectionsFor(st).forEach(function(sec){
+  var R = makeResolver(st), paras = [], breaks = state.settings.breaks || {}, runs = [];
+  orderedItems(st).forEach(function(o){
+    var last = runs[runs.length-1];
+    if(last && last[0].sec===o.sec) last.push(o); else runs.push([o]);
+  });
+  runs.forEach(function(run){
     R.reset();
-    var lines = sectionTemplates(sec, st).map(function(t){ return tidy(R.run(t)); });
-    if(!lines.length) return;
-    if(!paras.length || breaks[sec.id]) paras.push([]);
+    var lines = runTemplates(run, st).map(function(t){ return tidy(R.run(t)); });
+    if(!paras.length || breaks[run[0].sec.id]) paras.push([]);
     paras[paras.length-1] = paras[paras.length-1].concat(lines);
   });
   return {text: paras.map(function(p){ return p.join(' '); }).join('\n\n')};
@@ -1152,6 +1193,9 @@ function renderPreview(){
   $('sections').style.pointerEvents = ov ? 'none' : '';
   // The narrative is always editable: typing in it turns it into hand edits (st.override).
   var box = $('ovText');
+  box.hidden = reordering; $('reorder').hidden = !reordering; $('roBtn').classList.toggle('on', reordering);
+  $('roBtn').textContent = reordering ? 'Done' : '⇅ Reorder';
+  if(reordering) renderReorder(st);
   if((document.activeElement!==box || !ov) && box.value!==s.n.text) box.value = s.n.text;
   box.style.height = 'auto'; box.style.height = Math.max(300, box.scrollHeight+2)+'px';
 }
@@ -1231,7 +1275,7 @@ function step(d){ var i = state.students.indexOf(cur()); var n = state.students[
 $('prevBtn').onclick = function(){ step(-1); };
 $('nextBtn').onclick = function(){ step(1); };
 $('copyBtn').onclick = function(){ var st=cur(); if(st) copyText(narrative(st).text, 'Narrative copied'); };
-$('ovText').oninput = function(){ var st=cur(); if(!st) return; var was = st.override!=null; st.override=this.value; touch(st); renderPreview(); renderList(); if(!was) toast('Edited by hand. Back to builder undoes it.'); };
+$('ovText').oninput = function(){ reordering = false; var st=cur(); if(!st) return; var was = st.override!=null; st.override=this.value; touch(st); renderPreview(); renderList(); if(!was) toast('Edited by hand. Back to builder undoes it.'); };
 $('ovRevert').onclick = function(){
   var st=cur(), btn=this;
   if(btn.dataset.armed!=='1'){ btn.dataset.armed='1'; btn.textContent='Click again to drop your hand edits'; setTimeout(function(){ btn.dataset.armed=''; btn.textContent='Back to builder'; },3000); return; }
@@ -1240,6 +1284,54 @@ $('ovRevert').onclick = function(){
   st.override=null; touch(st); renderAll();
   toast('Your hand edits are set aside', function(){ putBack(before); });
 };
+
+/* ---------------- Reordering sentences (this student only) ---------------- */
+var reordering = false, dragKey = null;
+$('roBtn').onclick = function(){
+  var st = cur(); if(!st) return;
+  if(!reordering && st.override!=null){ toast('This narrative was edited by hand. Use Back to builder first to reorder its sentences.'); return; }
+  reordering = !reordering; renderPreview();
+};
+function moveSentence(st, key, toIndex){
+  var keys = orderedItems(st).map(function(o){ return o.key; }), from = keys.indexOf(key);
+  if(from<0) return;
+  keys.splice(from, 1); if(toIndex>from) toIndex--;
+  keys.splice(Math.max(0, Math.min(keys.length, toIndex)), 0, key);
+  st.sentOrder = keys; touch(st); renderPreview(); renderList();
+}
+function renderReorder(st){
+  var list = $('roList'); list.innerHTML = '';
+  var items = orderedItems(st);
+  $('roReset').hidden = !(st.sentOrder && st.sentOrder.length);
+  if(!items.length){ list.innerHTML = '<li style="cursor:default;color:var(--muted)">Nothing to reorder yet.</li>'; return; }
+  items.forEach(function(o, i){
+    var li = document.createElement('li'); li.draggable = true; li.dataset.key = o.key;
+    li.innerHTML = '<span class="grip" aria-hidden="true">⋮⋮</span><span class="rotext"><span class="rosec">'+esc(o.sec.title)+'</span>'+esc(tidy(resolve(o.t, st)))+'</span>';
+    var mv = document.createElement('span'); mv.className='romove';
+    [['▲','Move up',i-1],['▼','Move down',i+2]].forEach(function(b){
+      var x = document.createElement('button'); x.type='button'; x.textContent=b[0]; x.title=b[1]; x.setAttribute('aria-label', b[1]);
+      x.disabled = b[2]<0 || b[2]>items.length;
+      x.onclick = function(e){ e.stopPropagation(); moveSentence(st, o.key, b[2]); };
+      mv.appendChild(x);
+    });
+    li.appendChild(mv);
+    li.ondragstart = function(e){ dragKey = o.key; li.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', o.key); }catch(_){} };
+    li.ondragend = function(){ dragKey = null; li.classList.remove('dragging'); list.querySelectorAll('li').forEach(function(x){ x.classList.remove('over-before','over-after'); }); };
+    li.ondragover = function(e){
+      if(!dragKey) return; e.preventDefault();
+      var r = li.getBoundingClientRect(), after = e.clientY > r.top + r.height/2;
+      list.querySelectorAll('li').forEach(function(x){ x.classList.remove('over-before','over-after'); });
+      li.classList.add(after ? 'over-after' : 'over-before');
+    };
+    li.ondrop = function(e){
+      e.preventDefault(); if(!dragKey || dragKey===o.key) return;
+      var r = li.getBoundingClientRect(), after = e.clientY > r.top + r.height/2;
+      var k = dragKey; dragKey = null; moveSentence(st, k, i + (after ? 1 : 0));
+    };
+    list.appendChild(li);
+  });
+}
+$('roReset').onclick = function(){ var st = cur(); if(!st) return; st.sentOrder = null; touch(st); renderPreview(); renderList(); toast('Back to the usual order'); };
 
 /* ---------------- Roster paste ---------------- */
 function openPaste(){ $('pasteIn').value=''; $('pastePv').innerHTML='<span style="color:var(--muted)">Preview appears here.</span>'; $('pasteDlg').showModal(); $('pasteIn').focus(); }
