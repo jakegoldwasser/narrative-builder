@@ -410,7 +410,7 @@ var SLOTS = {
   w9_quote:{type:'text', ph:'paste a line of their writing', quote:true},
   w9_topic:{type:'text', ph:'subject or theme'},
   w9_adj:{opts:['poignant and surprising','vivid and moving','funny and inventive','courageous and imaginative','honest and powerful','beautifully observed']},
-  close:{opts:[
+  close:{def:1, opts:[
     'It has been a pleasure to teach {them} this {term}.',
     'I look forward to seeing {their} continued growth as a reader and writer.',
     '{Name} should be proud of this {term}’s work.',
@@ -491,8 +491,8 @@ var SECTIONS = [
   {id:'sw', title:'Student Writing', grades:['9'], sents:[
     {tpl:'<<w9_intro>> “<<w9_quote>>”', w9:'quote'},
     {tpl:'{Name}’s {piece} about <<w9_topic>> was <<w9_adj>>.', w9:'topic'}]},
-  {id:'close', title:'Closing', sents:[{tpl:'<<close>>'}]},
-  {id:'towork', title:'To Work On', goals:true, sents:[]}
+  {id:'towork', title:'To Work On', goals:true, sents:[]},
+  {id:'close', title:'Closing', sents:[{tpl:'<<close>>'}]}
 ];
 var DEFAULT_BREAKS = {sw:true, towork:true};
 function defaultSettings(s){
@@ -594,11 +594,13 @@ function quoteFmt(t){
   if(!/[.!?…]$/.test(t)) t += '.';
   return t;
 }
+/* A choice with a default (def) shows it until the teacher picks another or "— leave out —". */
+function choiceOf(key, st){ var s = SLOTS[key], v = st.sel[key]; return v===undefined && s.def!=null ? s.opts[s.def] : v; }
 /* returns the filled template, or null when unanswered (left out of the narrative) */
 function slotValue(key, st){
   var s = SLOTS[key];
   if(s.type==='text'){ var t=(st.text[key]||'').trim(); return t ? (s.quote ? quoteFmt(t) : t) : null; }
-  var v = st.sel[key];
+  var v = choiceOf(key, st);
   if(v==null || v==='' || v==='__none') return null;
   if(v==='__custom'){ var c=(st.custom[key]||'').trim(); return c || null; }
   return v;
@@ -725,9 +727,14 @@ function narrative(st){
   return {text: paras.map(function(p){ return p.join(' '); }).join('\n\n')};
 }
 function wc(t){ return (t.trim().match(/\S+/g)||[]).length; }
+/* Whether the teacher has answered anything yet (a default sentence alone doesn't count as started). */
+function started(st){
+  var any = function(o){ return Object.keys(o).some(function(k){ return o[k]!=null && o[k]!=='' && String(o[k]).trim()!==''; }); };
+  return st.override!=null || any(st.sel) || any(st.text) || any(st.extra) || any(st.rub);
+}
 function status(st){
   var n = narrative(st), w = wc(n.text);
-  return {cls: w===0 ? 'blank' : w > LIMIT ? 'over' : 'done', w:w, n:n};
+  return {cls: !started(st) ? 'blank' : w > LIMIT ? 'over' : 'done', w:w, n:n};
 }
 
 /* ---------------- UI: roster ---------------- */
@@ -759,7 +766,7 @@ function xButton(title, fn){
   b.onclick=fn; return b;
 }
 function choiceControl(key, st, onChange){
-  var s = SLOTS[key], v = st.sel[key];
+  var s = SLOTS[key], v = choiceOf(key, st);
   var frag = document.createDocumentFragment();
   var sel = document.createElement('select');
   var html = '<option value="">— leave out —</option>';
