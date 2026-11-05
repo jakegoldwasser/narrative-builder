@@ -111,6 +111,8 @@
   .gadd{flex:none;border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 12px;font-size:12px;color:var(--muted)}
   .gadd.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .goals .rrow{padding:5px 0}
+  .gcat{margin:14px 0 2px;padding-bottom:3px;border-bottom:1px solid var(--line);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+  .gcat:first-child{margin-top:4px}
   .pickrow{display:flex;gap:6px;align-items:center}
   .pickrow select{flex:1;min-width:0}
   .edbtn{flex:none;border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;color:var(--accent);white-space:nowrap}
@@ -540,6 +542,21 @@ var GOALS = [
     'coming to see me in student hours, where we can work through drafts and questions one on one',
     'seeking my help in student hours whenever a reading or assignment feels difficult']}
 ];
+/* To Work On's categories, in the order shown; the narrative takes the chosen goals in this order too. */
+var GOAL_CATS = [
+  {title:'Discussion', ids:['speak','hand','room','listen','eyes','ontext','group']},
+  {title:'Focus in Class', ids:['side','first','notes','askclass']},
+  {title:'Preparation & Responsibility', ids:['prompt','ready','prep','print','time','syllabus','account']},
+  {title:'Reading', ids:['careful','annot','vocab']},
+  {title:'Writing', ids:['bold','evidence','revise','proof']},
+  {title:'Getting Help', ids:['hours','ac']}
+];
+(function(){
+  var rank = {};
+  GOAL_CATS.forEach(function(c, i){ c.ids.forEach(function(id, j){ rank[id] = i*100 + j; }); });
+  GOALS.forEach(function(g, k){ if(!(g.id in rank)) rank[g.id] = 9900 + k; }); // any goal not given a category goes last
+  GOALS.sort(function(a, b){ return rank[a.id] - rank[b.id]; });
+})();
 function goalById(id){ return GOALS.find(function(g){ return g.id===id; }); }
 
 /* Sections, in narrative order. Whether a section starts a new paragraph is a class-wide setting (settings.breaks). */
@@ -1109,7 +1126,16 @@ function renderSections(){
     if(sec.id==='sw') d.appendChild(w9Bar(st, onChange));
     if(sec.goals){
       var gl = document.createElement('div'); gl.className='rub goals';
-      GOALS.forEach(function(g){ gl.appendChild(goalRow(g, st, onChange)); });
+      var placed = {};
+      GOAL_CATS.forEach(function(c){
+        var h = document.createElement('div'); h.className='gcat'; h.textContent=c.title; gl.appendChild(h);
+        c.ids.forEach(function(id){ var g = goalById(id); if(g){ placed[id]=1; gl.appendChild(goalRow(g, st, onChange)); } });
+      });
+      var rest = GOALS.filter(function(g){ return !placed[g.id]; });
+      if(rest.length){
+        var h2 = document.createElement('div'); h2.className='gcat'; h2.textContent='Other'; gl.appendChild(h2);
+        rest.forEach(function(g){ gl.appendChild(goalRow(g, st, onChange)); });
+      }
       d.appendChild(gl);
     }
     if(sec.rubric){
