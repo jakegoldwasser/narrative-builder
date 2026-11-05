@@ -153,6 +153,14 @@
   .dlg p{margin:6px 0;color:#3d474b;line-height:1.5}
   .dlg textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font:12px/1.4 ui-monospace,Menlo,monospace;min-height:130px}
   .dlg .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  #optDlg{max-width:780px}
+  .optdlg{max-height:84vh;overflow:auto}
+  .optdlg .gcat{margin-top:16px}
+  .optrow{display:flex;gap:6px;align-items:flex-start;margin:6px 0}
+  .optdlg textarea.opt{flex:1;min-height:0;font:15px/1.4 var(--serif);resize:none;overflow:hidden;padding:6px 8px}
+  .optdlg textarea.opt.add{border-style:dashed;background:transparent}
+  .optdlg .qx{margin-top:6px}
+  .optgone{flex:1;color:var(--muted);text-decoration:line-through;font:14px/1.4 var(--serif);padding:4px 0}
   .dlg .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
   .pastePv{max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;background:#fff}
   .pastePv div{padding:2px 0;border-bottom:1px solid #f1ede5}
@@ -294,6 +302,13 @@
   <p id="bkAuto" hidden>A full backup is also saved to your Drive every hour you work (and just before any student is removed or a backup restored): <a id="bkAutoLink" target="_blank" rel="noopener">open the Backups folder ↗</a>. Open one, copy its text, paste it here and click Restore.</p>
   <textarea id="bkText" style="min-height:200px"></textarea>
   <div class="actions"><button class="btn" onclick="bkDlg.close()">Close</button><button class="btn" id="bkCopy">Copy</button><button class="btn danger" id="bkRestore">Restore from pasted</button></div>
+</div></dialog>
+
+<dialog id="optDlg"><div class="dlg optdlg">
+  <h2 id="optTitle">Options</h2>
+  <p>Changes here are for every student from now on. Edit an option’s words in place, × removes one, and + adds one. Students who already have an option keep it until you change it for them.</p>
+  <div id="optList"></div>
+  <div class="actions"><button class="btn primary" onclick="optDlg.close()">Done</button></div>
 </div></dialog>
 
 <div class="toast" id="toast"></div>
@@ -590,7 +605,7 @@ function sectionsFor(st){ return SECTIONS.filter(function(s){ return !s.grades |
  */
 function mineFor(key){ return ((state.settings.mine||{})[key]) || []; }
 function latestMine(key, level){
-  var m = mineFor(key).filter(function(x){ return level==null || x.level==null || x.level===level; });
+  var m = mineFor(key).filter(function(x){ return !x.list && (level==null || x.level==null || x.level===level); });
   return m.length ? m[m.length-1].t : null;
 }
 var MODALS = /^(would|could|should|can|will|might|must|may|also|often|always|still|now|consistently|regularly|sometimes|really|truly|already|never|rarely|\w+ly)$/i;
@@ -646,7 +661,8 @@ function saveWording(st, key, text, level){
   text = (text||'').trim();
   if(!text) return;
   var tpl = templatize(text, st);
-  var builtin = SLOTS[key] ? SLOTS[key].opts : key.indexOf('g_')===0 ? goalById(key.slice(2)).opts : [].concat.apply([], [3,2,1,'next'].map(function(l){ return critById(key).opts[l]; }));
+  var builtin = [].concat.apply([], builtinGroups(key).map(function(g){ return g[1]; }));
+  if(builtin.indexOf(tpl)>-1 && hiddenFor(key).indexOf(tpl)>-1){ state.settings.hidden[key] = hiddenFor(key).filter(function(t){ return t!==tpl; }); state.settings.at = Date.now(); }
   if(builtin.indexOf(tpl)<0){
     var list = state.settings.mine[key] = mineFor(key).filter(function(x){ return x.t!==tpl; });
     list.push({t:tpl, level:level==null ? null : level});
@@ -660,6 +676,24 @@ function forgetWording(key, tpl){
   state.settings.mine[key] = mineFor(key).filter(function(x){ return x.t!==tpl; });
   (state.settings.mineGone = state.settings.mineGone || []).push({key:key, t:tpl}); // so another window's copy doesn't bring it back
 }
+/* ---------------- The list of options ----------------
+ * Each question's options can be edited, added to or removed, for every student (Edit the list of options…).
+ * A removed built-in option is kept in settings.hidden[key]; an edited one is hidden and its new words added
+ * to settings.mine[key] with list:true (one of the options, offered in turn, not preferred like an ✎ Edit).
+ */
+function hiddenFor(key){ return ((state.settings.hidden||{})[key]) || []; }
+function builtinGroups(key){ // [[label, options, level]]
+  if(SLOTS[key]) return [[null, SLOTS[key].opts, null]];
+  if(key.indexOf('g_')===0) return [[null, goalById(key.slice(2)).opts, null]];
+  var c = critById(key); return [3,2,1,'next'].map(function(l){ return [LEVEL_GROUP[l], c.opts[l], l]; });
+}
+/* What a student may be given at a level: the list's own additions, then the built-in options not removed. */
+function poolFor(key, level){
+  var lv = level==null ? null : level, hid = hiddenFor(key);
+  var g = builtinGroups(key).find(function(g){ return g[2]===lv; });
+  var mine = mineFor(key).filter(function(x){ return x.list && (x.level==null ? null : x.level)===lv; }).map(function(x){ return x.t; });
+  return mine.concat(g ? g[1].filter(function(t){ return hid.indexOf(t)<0; }) : []);
+}
 function hashOf(str){ var h=0; for(var i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))|0; } return Math.abs(h); }
 /* Marking a level fills that row's sentence (the level's sentences, varied by student so a class doesn't
    all read alike), unless the teacher has picked or written that row's sentence by hand. */
@@ -669,7 +703,8 @@ function rate(st, c, level){
   if(was===level){ clearQ(st, c.id); return; }
   st.rub[c.id] = level;
   if(!mine){
-    var arr = c.opts[level]; var v = latestMine(c.id, level) || arr[hashOf(st.id+c.id)%arr.length];
+    var arr = poolFor(c.id, level); if(!arr.length) arr = c.opts[level];
+    var v = latestMine(c.id, level) || arr[hashOf(st.id+c.id)%arr.length];
     st.sel[c.id] = v; st.auto[c.id] = v;
   }
 }
@@ -753,7 +788,11 @@ function quoteFmt(t){
   return t;
 }
 /* A choice with a default (def) shows it until the teacher picks another or "— leave out —". */
-function choiceOf(key, st){ var s = SLOTS[key], v = st.sel[key]; return v===undefined && s.def!=null ? (latestMine(key) || s.opts[s.def]) : v; }
+function choiceOf(key, st){
+  var s = SLOTS[key], v = st.sel[key];
+  if(v!==undefined || s.def==null) return v;
+  return latestMine(key) || (hiddenFor(key).indexOf(s.opts[s.def])<0 ? s.opts[s.def] : poolFor(key, null)[0]);
+}
 /* returns the filled template, or null when unanswered (left out of the narrative) */
 function slotValue(key, st){
   var s = SLOTS[key];
@@ -966,6 +1005,7 @@ function choiceControl(key, st, onChange){
   sel.value = v==null ? '' : v;
   sel.className = sel.value==='' ? 'none' : '';
   sel.onchange = function(){
+    if(sel.value==='__opts'){ sel.value = v==null ? '' : v; openOptions(st, key, onChange); return; }
     if(sel.value==='__custom') startEdit(st, key, same); else st.sel[key] = sel.value;
     onChange(true);
   };
@@ -983,14 +1023,23 @@ function choiceControl(key, st, onChange){
   return frag;
 }
 function optionsHtml(key, st, groups, fmt){
-  var seen = {}, html = '<option value="">— leave out —</option>';
+  var seen = {}, hid = hiddenFor(key), html = '<option value="">— leave out —</option>';
   var opt = function(o){ seen[o] = 1; return '<option value="'+esc(o)+'">'+esc(fmt(resolve(o, st)))+'</option>'; };
-  var mine = mineFor(key).map(function(x){ return x.t; }).reverse();
-  if(mine.length) html += '<optgroup label="Your wording">' + mine.map(opt).join('') + '</optgroup>';
-  groups.forEach(function(g){ var o = g[1].filter(function(x){ return !seen[x]; }); if(o.length) html += (g[0] ? '<optgroup label="'+esc(g[0])+'">' : '') + o.map(opt).join('') + (g[0] ? '</optgroup>' : ''); });
+  var mine = mineFor(key).slice().reverse();
+  var leveled = groups.some(function(g){ return g[2]!=null; });
+  var lv = function(x){ return x.level==null ? null : x.level; };
+  // the teacher's wordings go at the top of their level's group (or of the one list); any without a level, first
+  var top = leveled ? mine.filter(function(x){ return !groups.some(function(g){ return g[2]===lv(x); }); }).map(function(x){ return x.t; }) : [];
+  if(top.length) html += '<optgroup label="Your wording">' + top.map(opt).join('') + '</optgroup>';
+  groups.forEach(function(g){
+    var own = mine.filter(function(x){ return !leveled || lv(x)===g[2]; }).map(function(x){ return x.t; });
+    var o = own.concat(g[1].filter(function(t){ return hid.indexOf(t)<0; })).filter(function(x){ if(seen[x]) return false; seen[x] = 1; return true; });
+    o.forEach(function(x){ delete seen[x]; });
+    if(o.length) html += (g[0] ? '<optgroup label="'+esc(g[0])+'">' : '') + o.map(opt).join('') + (g[0] ? '</optgroup>' : '');
+  });
   var v = st.sel[key];
-  if(v && v!=='__custom' && !seen[v]) html += opt(v);
-  return html + '<option value="__custom">✎ edit this wording…</option>';
+  if(v && v!=='__custom' && !seen[v]) html += opt(v); // a removed option this student still has
+  return html + '<option value="__custom">✎ edit this wording…</option><option value="__opts">☰ edit the list of options…</option>';
 }
 /* Editing an answer starts from its words as they read now. */
 function startEdit(st, key, fmt){
@@ -1032,6 +1081,10 @@ function editTools(st, key, onChange, fmt, level){
     b.onclick = function(){ startEdit(st, key, fmt); onChange(true); };
   }
   frag.appendChild(b);
+  var ob = document.createElement('button'); ob.type='button'; ob.className='edbtn quiet'; ob.textContent='☰ Options';
+  ob.title = 'Edit, add or remove this question’s options, for every student';
+  ob.onclick = function(){ openOptions(st, key, onChange); };
+  frag.appendChild(ob);
   if(v && v!=='__custom' && mineFor(key).some(function(x){ return x.t===v; })){
     var f = document.createElement('button'); f.type='button'; f.className='edbtn quiet'; f.textContent='Remove from list';
     f.title = 'Stop offering this wording (students who have it keep it)';
@@ -1093,9 +1146,10 @@ function rubricRow(c, st, onChange){
     var same = function(t){ return t; };
     var pick = document.createElement('div'); pick.className='pickrow';
     var sel = document.createElement('select');
-    sel.innerHTML = optionsHtml(c.id, st, [3,2,1,'next'].map(function(l){ return [LEVEL_GROUP[l], c.opts[l]]; }), same);
+    sel.innerHTML = optionsHtml(c.id, st, builtinGroups(c.id), same);
     sel.value = st.sel[c.id];
     sel.onchange = function(){
+      if(sel.value==='__opts'){ sel.value = st.sel[c.id]; openOptions(st, c.id, onChange); return; }
       if(!sel.value){ clearQ(st, c.id); }
       else if(sel.value==='__custom') startEdit(st, c.id, same);
       else { st.sel[c.id] = sel.value; delete st.auto[c.id]; }
@@ -1188,7 +1242,11 @@ function goalRow(g, st, onChange){
   head.innerHTML = '<span class="rlabel">'+esc(g.label)+'</span>';
   var b = document.createElement('button'); b.type='button'; b.className='gadd'+(on?' on':''); b.textContent = on ? '✓ Added' : '+ Add';
   b.title = on ? 'Take this goal out of the narrative' : 'Add this goal to the narrative';
-  b.onclick = function(){ if(on) clearQ(st, key); else st.sel[key] = latestMine(key) || g.opts[hashOf(st.id+key)%g.opts.length]; onChange(true); };
+  b.onclick = function(){
+    if(on){ clearQ(st, key); onChange(true); return; }
+    var arr = poolFor(key, null); if(!arr.length) arr = g.opts;
+    st.sel[key] = latestMine(key) || arr[hashOf(st.id+key)%arr.length]; onChange(true);
+  };
   head.appendChild(b);
   row.appendChild(head);
   if(on){
@@ -1197,7 +1255,10 @@ function goalRow(g, st, onChange){
     var sel = document.createElement('select');
     sel.innerHTML = optionsHtml(key, st, [[null, g.opts]], cap).replace('<option value="">— leave out —</option>', '');
     sel.value = st.sel[key];
-    sel.onchange = function(){ if(sel.value==='__custom') startEdit(st, key, function(t){ return t; }); else st.sel[key] = sel.value; onChange(true); };
+    sel.onchange = function(){
+      if(sel.value==='__opts'){ sel.value = st.sel[key]; openOptions(st, key, onChange); return; }
+      if(sel.value==='__custom') startEdit(st, key, function(t){ return t; }); else st.sel[key] = sel.value; onChange(true);
+    };
     pick.appendChild(sel); pick.appendChild(editTools(st, key, onChange, function(t){ return t; }));
     line.appendChild(pick);
     if(st.sel[key]==='__custom'){
@@ -1541,8 +1602,127 @@ function copyText(text, msg, fallbackEl){
     navigator.clipboard.writeText(text).then(function(){ toast(msg); }, legacy);
   } else legacy();
 }
+/* ---------------- Edit the list of options (for every student) ---------------- */
+var optCtx = null;
+function optionTitle(key){
+  if(key.indexOf('g_')===0) return 'To Work On: '+goalById(key.slice(2)).label;
+  var c = critById(key); if(c) return c.label;
+  var sec = SECTIONS.find(function(s){ return s.sents.some(function(x){ return x.tpl.indexOf('<<'+key+'>>')>-1; }); });
+  return (sec ? sec.title : 'This blank')+': options';
+}
+function openOptions(st, key, onChange){
+  optCtx = {st:st, key:key, onChange:onChange};
+  $('optTitle').textContent = optionTitle(key);
+  renderOptions(); $('optDlg').showModal();
+}
+$('optDlg').addEventListener('close', function(){ var c = optCtx; optCtx = null; if(c){ renderList(); c.onChange(true); } });
+function growTa(ta){ ta.style.height='auto'; ta.style.height = ta.scrollHeight+2+'px'; }
+function optSnap(){
+  var st = optCtx.st, key = optCtx.key, S = state.settings;
+  var snap = JSON.stringify({mine:S.mine||{}, hidden:S.hidden||{}, gone:S.mineGone||[], sel:st.sel[key], auto:st.auto[key]});
+  return function(){
+    var o = JSON.parse(snap); S.mine = o.mine; S.hidden = o.hidden; S.mineGone = o.gone;
+    if(o.sel===undefined) delete st.sel[key]; else st.sel[key] = o.sel;
+    if(o.auto===undefined) delete st.auto[key]; else st.auto[key] = o.auto;
+    touchAll(); if(optCtx) renderOptions(); renderAll();
+  };
+}
+function renderOptions(){
+  var st = optCtx.st, key = optCtx.key, box = $('optList'); box.innerHTML = '';
+  var groups = builtinGroups(key), leveled = groups.length>1, hid = hiddenFor(key);
+  var lvOf = function(x){ return x.level==null ? null : x.level; };
+  var all = groups.map(function(g){ return {label:g[0], level:g[2], opts:g[1]}; });
+  var stray = leveled ? mineFor(key).filter(function(x){ return !groups.some(function(g){ return g[2]===lvOf(x); }); }) : [];
+  if(stray.length) all.unshift({label:'Your wording', level:null, opts:[], strayOnly:true});
+  all.forEach(function(g){
+    if(g.label){ var h = document.createElement('div'); h.className='gcat'; h.textContent = g.label; box.appendChild(h); }
+    var own = (g.strayOnly ? stray : mineFor(key).filter(function(x){ return !leveled || lvOf(x)===g.level; })).slice().reverse();
+    var items = own.map(function(x){ return {t:x.t, own:true}; })
+      .concat(g.opts.filter(function(t){ return hid.indexOf(t)<0; }).map(function(t){ return {t:t, own:false}; }));
+    items.forEach(function(it){
+      var row = document.createElement('div'); row.className='optrow';
+      var ta = document.createElement('textarea'); ta.className='opt'; ta.rows=1; ta.value = resolve(it.t, st);
+      ta.oninput = function(){ growTa(ta); };
+      ta.onchange = function(){ editOption(it, ta.value, g.level); };
+      var x = xButton('Remove this option, for every student', function(){ removeOption(it, g.level); });
+      row.appendChild(ta); row.appendChild(x); box.appendChild(row);
+      requestAnimationFrame(function(){ growTa(ta); });
+    });
+    if(g.strayOnly) return;
+    var add = document.createElement('textarea'); add.className='opt add'; add.rows=1;
+    add.placeholder = '+ Add an option'+(g.label ? ' ('+g.label.toLowerCase()+')' : '');
+    add.oninput = function(){ growTa(add); };
+    add.onchange = function(){ addOption(add.value, g.level); };
+    box.appendChild(add);
+  });
+  var gone = hid.filter(function(t){ return groups.some(function(g){ return g[1].indexOf(t)>-1; }); });
+  if(gone.length){
+    var h2 = document.createElement('div'); h2.className='gcat'; h2.textContent='Removed'; box.appendChild(h2);
+    gone.forEach(function(t){
+      var row = document.createElement('div'); row.className='optrow';
+      var sp = document.createElement('span'); sp.className='optgone'; sp.textContent = resolve(t, st);
+      var b = document.createElement('button'); b.type='button'; b.className='edbtn'; b.textContent='Put back';
+      b.title = 'Offer this option again, for every student';
+      b.onclick = function(){ state.settings.hidden[key] = hiddenFor(key).filter(function(x){ return x!==t; }); touchAll(); renderOptions(); };
+      row.appendChild(sp); row.appendChild(b); box.appendChild(row);
+    });
+  }
+}
+/* An edited option replaces the old one for everyone; this student's sentence follows it, and the others who have it can too. */
+function editOption(it, text, level){
+  var st = optCtx.st, key = optCtx.key, S = state.settings;
+  text = (text||'').trim().replace(/\s+/g, ' ');
+  if(!text){ removeOption(it, level); return; }
+  var undo = optSnap(), old = it.t, tpl = templatize(text, st);
+  if(tpl===old) return;
+  S.mine = S.mine || {};
+  if(it.own){
+    S.mine[key] = mineFor(key).map(function(x){ return x.t===old ? Object.assign({}, x, {t:tpl}) : x; });
+    (S.mineGone = S.mineGone || []).push({key:key, t:old}); // so another window's copy doesn't bring the old words back
+  } else {
+    (S.hidden = S.hidden || {})[key] = hiddenFor(key).concat([old]);
+    S.mine[key] = mineFor(key).concat([{t:tpl, level:level==null ? null : level, list:true}]);
+  }
+  it.t = tpl; it.own = true;
+  if(st.sel[key]===old){ st.sel[key] = tpl; if(st.auto[key]===old) st.auto[key] = tpl; touch(st); }
+  touchAll(); renderAll();
+  var others = state.students.filter(function(s){ return s!==st && s.sel[key]===old && s.override==null; });
+  if(!others.length){ toast('Changed for every student from now on.', undo); return; }
+  toast('Changed for students from now on. '+others.length+' other student'+(others.length===1?' has':'s have')+' the old words.', function(){
+    others.forEach(function(s){ s.sel[key] = tpl; if(s.auto[key]===old) s.auto[key] = tpl; touch(s); });
+    renderAll(); toast('Changed for '+others.length+' more student'+(others.length===1?'':'s'));
+  }, 'Change '+(others.length===1?'them':'them all')+' too');
+}
+/* A removed option isn't offered again. This student moves to another option; others who have it keep it. */
+function removeOption(it, level){
+  var st = optCtx.st, key = optCtx.key, S = state.settings, undo = optSnap();
+  if(it.own) forgetWording(key, it.t);
+  else (S.hidden = S.hidden || {})[key] = hiddenFor(key).concat([it.t]);
+  if(st.sel[key]===it.t){
+    var lv = SLOTS[key] || key.indexOf('g_')===0 ? null : (st.rub[key] || level);
+    var next = latestMine(key, lv) || poolFor(key, lv)[0];
+    if(next){ st.sel[key] = next; if(st.auto[key]===it.t) st.auto[key] = next; }
+    else if(SLOTS[key]) st.sel[key] = '';
+    touch(st);
+  }
+  touchAll(); renderOptions(); renderAll();
+  toast('Removed for every student.', undo);
+}
+function addOption(text, level){
+  var st = optCtx.st, key = optCtx.key, S = state.settings;
+  text = (text||'').trim().replace(/\s+/g, ' ');
+  if(!text) return;
+  var undo = optSnap(), tpl = templatize(text, st);
+  S.mine = S.mine || {};
+  if(!mineFor(key).some(function(x){ return x.t===tpl; })) S.mine[key] = mineFor(key).concat([{t:tpl, level:level==null ? null : level, list:true}]);
+  touchAll(); renderOptions(); renderAll();
+  toast('Added for every student.', undo);
+}
+
 var toastT; function toast(m, undo, label){
-  var t=$('toast'); t.textContent=m; t.classList.add('on'); t.classList.toggle('act', !!undo);
+  var t=$('toast'), host = $('optDlg').open ? $('optDlg') : document.body; // inside an open window, so Undo can be clicked
+  if(t.parentNode!==host) host.appendChild(t);
+  t.textContent=m; t.classList.add('on'); t.classList.toggle('act', !!undo);
   if(undo){ var b=document.createElement('button'); b.type='button'; b.textContent=label||'Undo'; b.onclick=function(){ t.classList.remove('on'); undo(); }; t.appendChild(b); }
   clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on');}, undo ? 12000 : 2600);
 }
