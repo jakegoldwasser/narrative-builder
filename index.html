@@ -124,6 +124,8 @@
   .roster .pg{font-size:10px;font-weight:600;color:var(--amber);background:#fbf1dc;border-radius:4px;padding:0 4px}
   .tag9{font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:1px 5px;letter-spacing:.05em}
 
+  .sec.handed > :not(h2):not(.secbanner){opacity:.45;pointer-events:none}
+  .secbanner{margin:6px 0 12px}
   .banner{background:#fbf1dc;border:1px solid #ecd39b;color:#6b4d00;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
 
   .preview{border-left:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;min-height:0}
@@ -236,7 +238,7 @@
         <label class="field name"><span>Student name</span><input id="fName" autocomplete="off"></label>
         <label class="field goes"><span>Goes by</span><input id="fGoes" autocomplete="off"></label>
         <label class="field"><span>Grade</span><select id="fGrade"></select></label>
-        <label class="field"><span>Pronouns <button type="button" class="guessbtn" id="pronOk" hidden title="These pronouns were guessed from the first name. Click once you've checked they're right.">Guess · confirm</button></span><select id="fPron"><option value="she">she / her</option><option value="he">he / him</option><option value="they">they / them</option><option value="name">always use their name (no pronouns)</option></select></label>
+        <label class="field"><span>Pronouns </span><select id="fPron"><option value="she">she / her</option><option value="he">he / him</option><option value="they">they / them</option><option value="name">always use their name (no pronouns)</option></select></label>
         <div class="grow"></div>
         <button class="btn" id="clearBtn" title="Clear every answer for this student">Clear sheet</button>
         <button class="btn ghost danger" id="delBtn">Remove student</button>
@@ -267,7 +269,7 @@
     <label class="inline">If two name columns, they're
       <select id="pOrder"><option value="fl">First | Last</option><option value="lf">Last | First</option></select></label>
     <label class="inline">Default grade <select id="pGrade"></select></label>
-    <label class="inline">Pronouns <select id="pPron"><option value="guess">guess from first name (check each one)</option><option value="they">they/them</option><option value="she">she/her</option><option value="he">he/him</option><option value="name">name only</option></select></label>
+    <label class="inline">Pronouns <select id="pPron"><option value="guess">guess from first name</option><option value="they">they/them</option><option value="she">she/her</option><option value="he">he/him</option><option value="name">name only</option></select></label>
   </div>
   <div class="pastePv" id="pastePv"><span style="color:var(--muted)">Preview appears here.</span></div>
   <div class="actions"><button class="btn" onclick="pasteDlg.close()">Cancel</button><button class="btn primary" id="pasteAdd">Add students</button></div>
@@ -709,7 +711,7 @@ function rate(st, c, level){
   }
 }
 function clearQ(st, id){ delete st.rub[id]; delete st.sel[id]; delete st.auto[id]; delete st.custom[id]; delete st.text[id]; }
-function clearSheet(st){ st.sentOrder=null; st.rub={}; st.sel={}; st.auto={}; st.custom={}; st.text={}; st.extra={}; st.override=null; st.w9.mode='quote'; }
+function clearSheet(st){ st.sentOrder=null; st.rub={}; st.sel={}; st.auto={}; st.custom={}; st.text={}; st.extra={}; st.override=null; st.edits={}; st.w9.mode='quote'; }
 
 /* ---------------- State ---------------- */
 var KEY = 'narrativeBuilder.v1';
@@ -728,7 +730,7 @@ function firstName(full){
 }
 /* A starting guess from common first names, to save setting every student by hand. Only names that are
    very commonly one or the other are listed; anything else (Jordan, Riley, Sam…) gets "they". A guess is
-   marked (pronGuess) in the list and beside Pronouns until the teacher confirms or changes it. */
+   kept (pronGuess) only so the guess follows the name as it's typed, until the teacher picks pronouns. */
 var NAMES_SHE = ('abigail ada addison adeline adriana alexa alexandra alexis alice alicia alina alison allison alyssa amanda amara amelia amy ana anastasia andrea angela angelina anna annabel annabelle anne annie anya ariana arianna audrey aurora ava bella beatrice bianca brianna brooke camila camille caroline catherine cecilia charlotte chelsea chloe claire clara clementine cora daisy daniela daphne delilah diana elena eleanor eliana elisa eliza elizabeth ella ellie eloise elsa emilia emily emma esme esther eva evelyn faith fatima fiona francesca gabriela gabriella gabrielle genevieve georgia gianna grace gracie hailey hana hannah harper hazel helen imogen ingrid iris isabel isabella isabelle isla ivy jacqueline jade jane jasmine jenna jennifer jessica josephine julia juliana julie juliet june kaitlyn katherine kathryn katie kayla kylie lara laura lauren layla leah leila lena lila lilah liliana lillian lily lucia lucy luna lydia mabel madeleine madeline madison maeve maria mariana marina margaret maya megan melanie mia michelle mila miriam molly naomi natalia natalie nina noa nora olivia penelope phoebe piper poppy priya rachel rebecca rosa rose rosie ruby ruth sabrina sadie samantha sara sarah savannah scarlett serena sienna sofia sophia sophie stella summer talia tessa valentina valeria vanessa victoria violet vivian willa zara zoe zoey').split(' ');
 var NAMES_HE = ('aaron abraham adam adrian aidan alan albert alexander alfred andrew angelo anthony antonio arjun arthur asher august austin axel benjamin bennett brandon brian bruno caleb calvin carlos carter cayden charles christian christopher cole colin connor cooper daniel dante david declan dennis diego dominic douglas dylan edward eli elias elijah emmanuel eric ethan evan ezra felix finn francis frank gabriel george gideon graham grant gregory gus gustavo harrison harry hector henry hudson hugo ian isaac isaiah ivan jack jackson jacob jake james jared jasper javier jeremiah jeremy jonah jonathan jose joseph joshua josiah juan julian justin kevin kenneth kyle laurence leo leon leonardo levi liam lincoln lorenzo louis luca lucas luis luke malcolm marco marcus mark martin mason matthew max maxwell michael miles mohammed muhammad nathan nathaniel nicholas noah oliver omar oscar owen patrick paul peter philip ralph raphael richard robert roman ryan samuel sebastian seth simon stephen steven theo theodore thomas timothy tobias tristan victor vincent walter william wyatt xavier zachary zachariah').split(' ');
 function guessPronouns(first){
@@ -737,7 +739,7 @@ function guessPronouns(first){
 }
 function newStudent(name, grade, pron){
   return {id:uid(), name:name||'', goesBy:firstName(name), grade:grade||'9', pronouns:pron||'they',
-    sel:{}, custom:{}, text:{}, extra:{}, rub:{}, auto:{}, w9:{mode:'quote', piece:'poem', pieceCustom:''}, override:null};
+    sel:{}, custom:{}, text:{}, extra:{}, rub:{}, auto:{}, w9:{mode:'quote', piece:'poem', pieceCustom:''}, override:null, edits:{}};
 }
 
 /* ---------------- Rendering text ---------------- */
@@ -943,26 +945,98 @@ function runTemplates(run, st){
   if(lead) out[0].t = RUBRIC[sec.rubric].lead + '{they} ' + out[0].t.slice(7);
   return out.map(function(o){ return o.t; });
 }
-function narrative(st){
-  if(st.override!=null) return {text:st.override};
-  var R = makeResolver(st), paras = [], breaks = state.settings.breaks || {}, runs = [];
+/* Many independent clauses strung together with ", and": the second "and" becomes a semicolon
+   ("She reads closely, and she writes well; she joins in"). Only where what follows reads as a clause
+   of its own (it starts with a pronoun, the student's name, or "the/this/that"), so a list ("reads,
+   writes, and speaks") is left alone. */
+function semicolons(line, st){
+  var names = [nameOf(st), firstName(st.name||'')].filter(Boolean).map(function(n){ return n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); });
+  var subj = new RegExp('^(?:she|he|they|I|it|her|his|their|the|this|that|these|those|both'+(names.length?'|'+names.join('|'):'')+')\\b');
+  return line.replace(/[^.!?]+[.!?]*/g, function(sent){
+    var n = 0;
+    return sent.replace(/, and (?=(\S+))/g, function(m, next, at){
+      n++;
+      return n===2 && subj.test(sent.slice(at+6)) ? '; ' : m;
+    });
+  });
+}
+/* The narrative in pieces, one per run of a section's sentences (key "read", or "read#1" for a second
+   run after reordering). A piece edited by hand (st.edits[key].t, with its separator) replaces what the
+   builder would write there; the rest follow the choices as usual. */
+function narrativePieces(st){
+  var R = makeResolver(st), breaks = state.settings.breaks || {}, runs = [], out = [], n = {};
   orderedItems(st).forEach(function(o){
     var last = runs[runs.length-1];
     if(last && last[0].sec===o.sec) last.push(o); else runs.push([o]);
   });
   runs.forEach(function(run){
     R.reset();
-    var lines = runTemplates(run, st).map(function(t){ return tidy(R.run(t)); });
-    if(!paras.length || breaks[run[0].sec.id]) paras.push([]);
-    paras[paras.length-1] = paras[paras.length-1].concat(lines);
+    var id = run[0].sec.id, k = n[id] = (n[id]==null ? 0 : n[id]+1);
+    var lines = runTemplates(run, st).map(function(t){ return semicolons(tidy(R.run(t)), st); });
+    out.push({key: k ? id+'#'+k : id, sec: run[0].sec, sep: !out.length ? '' : breaks[id] ? '\n\n' : ' ', text: lines.join(' ')});
   });
-  return {text: paras.map(function(p){ return p.join(' '); }).join('\n\n')};
+  var ed = st.edits || {}, seen = {};
+  out.forEach(function(p){ seen[p.key] = 1; });
+  Object.keys(ed).forEach(function(k){ if(!seen[k] && ed[k].t) out.push({key:k, sec:null, sep:' ', text:'', orphan:true}); });
+  var at = 0;
+  out.forEach(function(p){
+    var e = ed[p.key];
+    p.full = e ? e.t : p.sep + p.text;
+    p.edited = !!e;
+    if(e){
+      if(at===0) p.full = p.full.replace(/^\s+/, '');
+      else if(p.full && !/^\s/.test(p.full)) p.full = ' ' + p.full;
+    }
+    p.from = at; at += p.full.length; p.to = at;
+  });
+  return out;
 }
+function narrative(st){
+  if(st.override!=null){ var o = st.override; st.override = null; st.edits = {}; setHandText(st, o); }
+  return {text: narrativePieces(st).map(function(p){ return p.full; }).join('')};
+}
+function hasEdits(st){ return !!st.edits && Object.keys(st.edits).length > 0; }
+/* Typing in the narrative: only the pieces the change touches become hand edits. A change across two
+   pieces makes one edit of both (the second kept as an empty edit pointing at the first, by). */
+function setHandText(st, text){
+  var ps = narrativePieces(st), old = ps.map(function(p){ return p.full; }).join('');
+  if(old===text) return;
+  var a = 0, lo = old.length, ln = text.length;
+  while(a<lo && a<ln && old[a]===text[a]) a++;
+  var z = 0;
+  while(z<lo-a && z<ln-a && old[lo-1-z]===text[ln-1-z]) z++;
+  var b = lo - z;
+  var hit = ps.filter(function(p){ return a===b ? (p.from < a && a <= p.to) || (a===0 && p.from===0) : p.from < b && p.to > a; });
+  st.edits = st.edits || {};
+  if(!hit.length){ // nothing to edit yet: the teacher's own words, on their own
+    var own = st.edits.__own ? st.edits.__own.t : '';
+    st.edits.__own = {t: own + text.slice(old.length)}; return;
+  }
+  var first = hit[0], last = hit[hit.length-1];
+  var keys = [];
+  hit.forEach(function(p){ var e = st.edits[p.key]; if(e && e.by) keys.push(e.by); keys.push(p.key); if(e && e.also) keys = keys.concat(e.also); });
+  keys = keys.filter(function(k, i){ return keys.indexOf(k)===i && k!==first.key; });
+  st.edits[first.key] = {t: text.slice(first.from, last.to - lo + ln)};
+  if(keys.length) st.edits[first.key].also = keys;
+  keys.forEach(function(k){ st.edits[k] = {t:'', by:first.key}; });
+}
+/* Back to builder for one section: its hand edits go, with any edit it shares with another section. */
+function editGroup(st, secId){
+  var ed = st.edits || {}, keys = [];
+  Object.keys(ed).forEach(function(k){
+    if(k.split('#')[0]!==secId) return;
+    var root = ed[k].by || k;
+    keys.push(root);
+    (ed[root] && ed[root].also || []).forEach(function(x){ keys.push(x); });
+  });
+  return keys.filter(function(k, i){ return keys.indexOf(k)===i; });
+}
+function sectionEdited(st, secId){ return editGroup(st, secId).length > 0; }
 function wc(t){ return (t.trim().match(/\S+/g)||[]).length; }
 /* Whether the teacher has answered anything yet (a default sentence alone doesn't count as started). */
 function started(st){
   var any = function(o){ return Object.keys(o).some(function(k){ return o[k]!=null && o[k]!=='' && String(o[k]).trim()!==''; }); };
-  return st.override!=null || any(st.sel) || any(st.text) || any(st.extra) || any(st.rub);
+  return hasEdits(st) || any(st.sel) || any(st.text) || any(st.extra) || any(st.rub);
 }
 function status(st){
   var n = narrative(st), w = wc(n.text);
@@ -976,7 +1050,7 @@ function renderList(){
     var s = status(st);
     var li = document.createElement('li');
     if(st.id===state.currentId) li.className='sel';
-    li.innerHTML = '<span class="dot '+s.cls+'"></span><span class="nm">'+esc(st.name||'(no name)')+'</span>'+(st.pronGuess?'<span class="pg" title="Pronouns guessed from the first name: not yet confirmed">'+esc(st.pronouns)+'?</span>':'')+'<span class="wc">'+s.w+'</span>';
+    li.innerHTML = '<span class="dot '+s.cls+'"></span><span class="nm">'+esc(st.name||'(no name)')+'</span>'+'<span class="wc">'+s.w+'</span>';
     li.onclick = function(){ select(st.id); };
     ul.appendChild(li);
   });
@@ -1177,6 +1251,22 @@ function renderSections(){
     var h = document.createElement('h2');
     h.innerHTML = '<span class="secnum">'+(n+1)+'</span>'+esc(sec.title);
     d.appendChild(h);
+    if(sectionEdited(st, sec.id)){
+      d.classList.add('handed');
+      var group = editGroup(st, sec.id), names = [];
+      group.forEach(function(k){ var sid = k.split('#')[0], s2 = SECTIONS.filter(function(x){ return x.id===sid; })[0]; if(sid!==sec.id && s2 && names.indexOf(s2.title)<0) names.push(s2.title); });
+      var bn = document.createElement('div'); bn.className='banner secbanner';
+      bn.innerHTML = '<span>You edited this part of the narrative by hand, so these choices won\u2019t change it'+(names.length ? ' (your edit runs on into '+esc(names.join(' and '))+')' : '')+'.</span>';
+      var back = document.createElement('button'); back.className='btn'; back.type='button'; back.textContent='Back to builder';
+      back.onclick = function(){
+        if(back.dataset.armed!=='1'){ back.dataset.armed='1'; back.textContent='Click again to drop this edit'; setTimeout(function(){ back.dataset.armed=''; back.textContent='Back to builder'; },3000); return; }
+        var was = JSON.stringify(st);
+        group.forEach(function(k){ delete st.edits[k]; });
+        touch(st); renderAll();
+        toast('Your hand edit to '+sec.title+' is set aside', function(){ putBack(was); });
+      };
+      bn.appendChild(back); d.appendChild(bn);
+    }
     if(sec.id==='sw') d.appendChild(w9Bar(st, onChange));
     if(sec.goals){
       var gl = document.createElement('div'); gl.className='rub goals';
@@ -1306,11 +1396,9 @@ function renderPreview(){
   $('bar').firstChild.style.width = Math.min(100, s.w/LIMIT*100)+'%';
   $('overNote').hidden = !over;
   $('overNote').textContent = over ? (s.w-LIMIT)+' word'+(s.w-LIMIT===1?'':'s')+' over the '+LIMIT+'-word limit. Nothing has been cut; edit or clear something to shorten it.' : '';
-  var ov = st.override!=null;
-  $('ovBanner').hidden = !ov;
-  $('sections').style.opacity = ov ? .45 : 1;
-  $('sections').style.pointerEvents = ov ? 'none' : '';
-  // The narrative is always editable: typing in it turns it into hand edits (st.override).
+  var ov = hasEdits(st);
+  $('ovBanner').hidden = true;
+  // The narrative is always editable: typing in it turns the parts typed in into hand edits (st.edits).
   var box = $('ovText');
   box.hidden = reordering; $('reorder').hidden = !reordering; $('roBtn').classList.toggle('on', reordering);
   $('roBtn').textContent = reordering ? 'Done' : '⇅ Reorder';
@@ -1326,7 +1414,6 @@ function renderHeader(){
   if(!st && state.students.length){ state.currentId = state.students[0].id; return renderAll(); }
   if(!st) return;
   $('fName').value = st.name; $('fGoes').value = st.goesBy; $('fGrade').value = st.grade; $('fPron').value = st.pronouns;
-  $('pronOk').hidden = !st.pronGuess;
 }
 function renderAll(){ renderHeader(); renderList(); renderSections(); renderPreview(); renderTrash(); }
 
@@ -1347,7 +1434,6 @@ function reguess(st){ if(st.pronGuess){ st.pronouns = guessPronouns(nameOf(st));
 $('fGoes').oninput = function(){ var st=cur(); st.goesBy=this.value; reguess(st); touch(st); renderPreview(); renderList(); debounceSections(); };
 $('fGrade').onchange = function(){ var st=cur(); st.grade=this.value; touch(st); renderAll(); };
 $('fPron').onchange = function(){ var st=cur(); st.pronouns=this.value; st.pronGuess=false; touch(st); renderAll(); };
-$('pronOk').onclick = function(){ var st=cur(); st.pronGuess=false; touch(st); renderAll(); toast('Pronouns confirmed for '+nameOf(st)); };
 $('termSel').onchange = function(){ state.settings.term=this.value; touchAll(); renderAll(); };
 $('linkChk').onchange = function(){ state.settings.link=this.checked; touchAll(); renderAll(); };
 var secTimer; function debounceSections(){ clearTimeout(secTimer); secTimer=setTimeout(renderSections, 500); }
@@ -1394,13 +1480,18 @@ function step(d){ var i = state.students.indexOf(cur()); var n = state.students[
 $('prevBtn').onclick = function(){ step(-1); };
 $('nextBtn').onclick = function(){ step(1); };
 $('copyBtn').onclick = function(){ var st=cur(); if(st) copyText(narrative(st).text, 'Narrative copied'); };
-$('ovText').oninput = function(){ reordering = false; var st=cur(); if(!st) return; var was = st.override!=null; st.override=this.value; touch(st); renderPreview(); renderList(); if(!was) toast('Edited by hand. Back to builder undoes it.'); };
+$('ovText').oninput = function(){
+  reordering = false; var st=cur(); if(!st) return;
+  var before = JSON.stringify(st.edits||{});
+  setHandText(st, this.value); touch(st); renderPreview(); renderList();
+  if(JSON.stringify(Object.keys(st.edits||{}).sort()) !== JSON.stringify(Object.keys(JSON.parse(before)).sort())) debounceSections();
+};
 $('ovRevert').onclick = function(){
   var st=cur(), btn=this;
   if(btn.dataset.armed!=='1'){ btn.dataset.armed='1'; btn.textContent='Click again to drop your hand edits'; setTimeout(function(){ btn.dataset.armed=''; btn.textContent='Back to builder'; },3000); return; }
   btn.dataset.armed=''; btn.textContent='Back to builder';
   var before = JSON.stringify(st);
-  st.override=null; touch(st); renderAll();
+  st.override=null; st.edits={}; touch(st); renderAll();
   toast('Your hand edits are set aside', function(){ putBack(before); });
 };
 
@@ -1408,7 +1499,7 @@ $('ovRevert').onclick = function(){
 var reordering = false, dragKey = null;
 $('roBtn').onclick = function(){
   var st = cur(); if(!st) return;
-  if(!reordering && st.override!=null){ toast('This narrative was edited by hand. Use Back to builder first to reorder its sentences.'); return; }
+  if(!reordering && hasEdits(st)){ toast('Part of this narrative was edited by hand. Put those parts back to the builder first to reorder its sentences.'); return; }
   reordering = !reordering; renderPreview();
 };
 function moveSentence(st, key, toIndex){
@@ -1524,9 +1615,7 @@ function vcPayload(){
 }
 function vcRefresh(){
   var p = vcPayload(), skipped = state.students.length - p.length;
-  var guesses = state.students.filter(function(s){ return s.pronGuess; }).map(function(s){ return s.name||'(no name)'; });
-  $('vcSummary').textContent = p.length+' narrative'+(p.length===1?'':'s')+' ready'+(skipped?' · '+skipped+' not finished, left out':'')+'.'
-    + (guesses.length ? ' Pronouns still a guess (not yet confirmed): '+guesses.join(', ')+'.' : '');
+  $('vcSummary').textContent = p.length+' narrative'+(p.length===1?'':'s')+' ready'+(skipped?' · '+skipped+' not finished, left out':'')+'.';
   $('vcOut').value = JSON.stringify(p);
 }
 $('vcBtn').onclick = function(){ vcRefresh(); $('vcDlg').showModal(); };
@@ -1804,7 +1893,7 @@ function upgrade(s){
   b.sel=b.sel||{}; b.rub=b.rub||{}; b.auto=b.auto||{}; b.custom=b.custom||{}; b.text=b.text||{}; b.extra=b.extra||{};
   b.w9 = Object.assign({mode:'quote', piece:'poem', pieceCustom:''}, s.w9||{});
   if(b.sel.w9_intro==='{Their} submission to the Ninth Grade Writing Quarterly included this line:') b.sel.w9_intro = SLOTS.w9_intro.opts[0];
-  if(b.override===undefined) b.override=null;
+  if(b.override===undefined) b.override=null; b.edits = b.edits || {};
   b.grade = String(b.grade||'9');
   return b;
 }
