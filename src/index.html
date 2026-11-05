@@ -391,30 +391,35 @@ var RUBRIC = {
   ]},
   part:{lead:'In class, ', skip:/\bclass\b/i, crit:[
     {id:'p_discuss', label:'Discussion', desc:'Offers ideas and questions without prompting; ties comments to quotes from the text', opts:{
-      3:['{They} offer[s] insightful ideas and questions without prompting, grounding {their} comments in the text.','{They} make[s] regular contributions that show an in-depth understanding of the material and challenge conventional interpretations.','{They} {is} a leading voice in our discussions, raising questions that open up the text for everyone.'],
-      2:['{They} contribute[s] thoughtful comments that show a thorough reading of the text.','{They} participate[s] regularly in discussion, offering ideas grounded in the reading.'],
-      1:['I encourage {them} to offer ideas and questions in discussion without prompting.','{They} contribute[s] occasionally, showing a partial reading of the text.','I encourage {them} to share {their} ideas in discussion more often, since {they} {has} valuable insights to offer.'],
-      next:['I encourage {them} to connect {their} comments more directly to quotations from the text.']}},
+      3:['{They} offer[s] insightful ideas and questions without prompting, grounding {their} comments in the text.','{They} make[s] regular contributions that show an in-depth understanding of the material and challenge conventional interpretations.','{They} {is} a leading voice in our discussions, raising questions that open up the text for everyone.','{They} help[s] to keep our conversation lively, scholarly, and civil, and always focused on the text.','{They} connect[s] {their} comments and questions directly to quotations from the text, often with precocious insight.','{Their} comments in discussion reflect a deep, integrative, and imaginative reading of the text.'],
+      2:['{They} contribute[s] thoughtful comments that show a thorough reading of the text.','{They} participate[s] regularly in discussion, offering ideas grounded in the reading.','{They} help[s] to keep our discussions focused on the text.','{They} offer[s] ideas and questions that show a timely, thorough reading of the assignment.','{They} speak[s] audibly and respectfully in discussion, and {their} comments reflect a careful reading of the text.'],
+      1:['I encourage {them} to offer ideas and questions in discussion without prompting.','{They} contribute[s] occasionally, showing a partial reading of the text.','I encourage {them} to share {their} ideas in discussion more often, since {they} {has} valuable insights to offer.','{They} participate[s] in discussion only from time to time, in ways that suggest a partial or cursory reading of the text.','I encourage {them} to keep {their} comments focused on the text and tied to specific quotations.','I encourage {them} to speak audibly and politely, never out of turn or over a classmate.'],
+      next:['I encourage {them} to connect {their} comments more directly to quotations from the text.','I encourage {them} to push {their} comments toward more imaginative, integrative readings that connect one part of a text to another.']}},
     {id:'p_listen', label:'Listening & room for others', desc:'Listens intently; builds on peers; lets others speak once before speaking twice', opts:{
-      3:['{They} bring[s] out the best in {their} classmates, listening intently and making room for every voice.','{They} listen[s] with generosity and care, and {their} responses show how closely {they} attend[s] to others.'],
-      2:['{They} listen[s] attentively and build[s] on {their} classmates’ comments.','{They} respect[s] {their} classmates’ ideas and respond[s] to them thoughtfully.'],
-      1:['I encourage {them} to listen more intently to classmates and make room for every voice.','I encourage {them} to build on classmates’ comments before introducing a new idea.'],
-      next:['I encourage {them} to connect {their} comments more often to those of {their} classmates.']}},
+      3:['{They} bring[s] out the best in {their} classmates, listening intently and making room for every voice.','{They} listen[s] with generosity and care, and {their} responses show how closely {they} attend[s] to others.','{They} show[s] deep empathy for {their} classmates, tracking every speaker and responding directly to what they have said.','{They} model[s] excellent classroom citizenship, allowing others to speak once before speaking twice.'],
+      2:['{They} listen[s] attentively and build[s] on {their} classmates’ comments.','{They} respect[s] {their} classmates’ ideas and respond[s] to them thoughtfully.','{They} track[s] each speaker and listen[s] closely rather than simply waiting for a turn to speak.','{They} show[s] empathy and respect for {their} classmates in discussion.'],
+      1:['I encourage {them} to listen more intently to classmates and make room for every voice.','I encourage {them} to build on classmates’ comments before introducing a new idea.','I encourage {them} to track each speaker with {their} eyes and to listen intently, rather than waiting for a turn to speak.','I encourage {them} to make room for every voice by letting others speak once before speaking twice.'],
+      next:['I encourage {them} to connect {their} comments more often to those of {their} classmates.','I encourage {them} to invite quieter classmates into the conversation by responding to their ideas.']}},
     {id:'p_prep', label:'Preparedness', desc:'Annotated text and assignments every day; ready when class starts; meets deadlines', opts:{
-      3:['{They} arrive[s] fully prepared every day, with {their} annotated text and assignments in hand.','{They} come[s] to every class ready to work, with {their} reading done and {their} ideas in hand.'],
-      2:['{They} arrive[s] prepared and ready to work.','{They} complete[s] {their} assignments on time and come[s] to class ready to participate.'],
-      1:['I encourage {them} to bring {their} annotated text and assignments to every class, ready to start when class begins.','{They} {is} working toward arriving consistently prepared.','I encourage {them} to complete each assignment fully and on time.'],
-      next:['I encourage {them} to communicate with me in advance whenever a deadline becomes difficult.']}},
+      3:['{They} arrive[s] fully prepared every day, with {their} annotated text and assignments in hand.','{They} come[s] to every class ready to work, with {their} reading done and {their} ideas in hand.','{They} {is} ready to begin the moment class starts, seated with {their} materials out and {their} thoughts collected.','{They} look[s] up and define[s] every unfamiliar word in {their} annotations.','{They} meet[s] every deadline, bringing printed copies of {their} work to class without reminders.'],
+      2:['{They} arrive[s] prepared and ready to work.','{They} complete[s] {their} assignments on time and come[s] to class ready to participate.','{They} know[s] the policies of the syllabus and follow[s] them without needing reminders.','{They} bring[s] {their} annotated text and printed assignments to class.','{They} communicate[s] with me in advance when {they} face[s] a delay.'],
+      1:['I encourage {them} to bring {their} annotated text and assignments to every class, ready to start when class begins.','{They} {is} working toward arriving consistently prepared.','I encourage {them} to complete each assignment fully and on time.','I encourage {them} to be ready to start when class begins: seated, bag away, materials out, and thoughts collected.','I encourage {them} to bring printed copies of {their} assignments to class by the deadline.','I encourage {them} to look up and write down definitions of unfamiliar words as {they} annotate[s].','I encourage {them} to familiarize {themself} with the policies of the syllabus.','I encourage {them} to take accountability when {they} {has} not finished the reading, rather than making excuses.'],
+      next:['I encourage {them} to communicate with me in advance whenever a deadline becomes difficult.','I encourage {them} to meet with me outside of class, without prompting, to prepare for major assignments.']}},
     {id:'p_focus', label:'Focus & notes', desc:'Follows instructions the first time; consistent notes; no side conversations', opts:{
-      3:['{They} raise[s] the focus, energy, and insight of our class.','{They} bring[s] steady focus and energy to every class.'],
-      2:['{They} stay[s] focused in class and take[s] consistent notes.','{They} follow[s] instructions carefully and stay[s] engaged throughout our work.'],
-      1:['I encourage {them} to avoid side conversations and respond to instructions the first time.','{They} {is} working on staying focused throughout class.','I encourage {them} to stay focused for the full period and to take notes without prompting.'],
+      3:['{They} raise[s] the focus, energy, and insight of our class.','{They} bring[s] steady focus and energy to every class.','{They} respond[s] to spoken and written instructions the first time and take[s] excellent notes without prompting.','{They} keep[s] {their} attention on our shared work, saving personal business for meetings outside of class.'],
+      2:['{They} stay[s] focused in class and take[s] consistent notes.','{They} follow[s] instructions carefully and stay[s] engaged throughout our work.','{They} avoid[s] side conversations and keep[s] {their} attention on our discussion.','{They} ask[s] questions that are relevant to the whole class.'],
+      1:['I encourage {them} to avoid side conversations and respond to instructions the first time.','{They} {is} working on staying focused throughout class.','I encourage {them} to stay focused for the full period and to take notes without prompting.','I encourage {them} to save personal business for meetings outside of class.','I encourage {them} to ask questions that are relevant to the whole class, saving questions about {their} own project for a meeting with me.','I encourage {them} to avoid side conversations, even on-topic ones, so that {their} full attention goes to our discussion.'],
       next:['I encourage {them} to take notes more consistently, without prompting.']}},
     {id:'p_group', label:'Group work', desc:'Takes part respectfully and enthusiastically; fosters equal participation', opts:{
-      3:['{They} take[s] on leadership in small groups, building a collegial atmosphere that fosters equal participation.','{They} {is} a generous collaborator, drawing out quieter classmates and keeping {their} group on task.'],
-      2:['{They} take[s] part respectfully and enthusiastically in group work.','{They} work[s] well with others and contribute[s] {their} share in small groups.'],
-      1:['I encourage {them} to stay on task and contribute equally during small-group work.','{They} participate[s] willingly in small-group work.','I encourage {them} to take a more active role in small-group work.'],
-      next:['I encourage {them} to take on more of a leadership role in small groups.']}}
+      3:['{They} take[s] on leadership in small groups, building a collegial atmosphere that fosters equal participation.','{They} {is} a generous collaborator, drawing out quieter classmates and keeping {their} group on task.','{They} collaborate[s] meaningfully, bringing outstanding citizenship and empathy to partner and group work.'],
+      2:['{They} take[s] part respectfully and enthusiastically in group work.','{They} work[s] well with others and contribute[s] {their} share in small groups.','{They} {is} a respectful, reliable partner in pair and group work.'],
+      1:['I encourage {them} to stay on task and contribute equally during small-group work.','{They} participate[s] willingly in small-group work.','I encourage {them} to take a more active role in small-group work.','I encourage {them} to take part more enthusiastically in partner and group work.'],
+      next:['I encourage {them} to take on more of a leadership role in small groups.']}},
+    {id:'p_citizen', label:'Citizenship & respect', desc:'Classroom citizenship; empathy and respect for classmates; speaks audibly and politely, never out of turn', opts:{
+      3:['{They} {is} an outstanding classroom citizen, showing deep empathy for {their} classmates.','{They} make[s] our classroom a more generous, respectful place to think together.','{They} help[s] to keep our discussions civil and kind, even when we disagree.'],
+      2:['{They} {is} a good classroom citizen who treat[s] {their} classmates with respect.','{They} speak[s] politely and wait[s] {their} turn in discussion.','{They} show[s] empathy and respect for {their} classmates.'],
+      1:['I encourage {them} to show more consistent respect for {their} classmates, never speaking out of turn or over another student.','{They} {is} working toward more consistent classroom citizenship.','I encourage {them} to follow our class norms consistently, arriving on time and avoiding distractions.'],
+      next:['I encourage {them} to use {their} standing in the class to help set a tone of empathy and respect.']}}
   ]}
 };
 function critsFor(area, st){ return RUBRIC[area].crit.filter(function(c){ return !c.g || c.g.indexOf(st.grade)>-1; }); }
@@ -504,6 +509,33 @@ var GOALS = [
   {id:'ac', label:'Seek help from the Academic Center', opts:[
     'making use of the Academic Center, where {they} can build strong habits of study and organization',
     'visiting the Academic Center for support with planning and study skills']},
+  {id:'eyes', label:'Track every speaker', opts:[
+    'tracking every speaker with {their} eyes, a simple habit that will deepen {their} listening',
+    'listening intently while others speak, rather than waiting for a turn to speak']},
+  {id:'first', label:'Respond to instructions the first time', opts:[
+    'responding to spoken and written instructions the first time they are given',
+    'listening closely to instructions so that {they} can begin each task without needing reminders']},
+  {id:'ontext', label:'Keep discussion focused on the text', opts:[
+    'helping to keep our discussion focused on the text, connecting {their} comments to specific passages',
+    'connecting {their} comments to those of classmates and to quotations from the text']},
+  {id:'print', label:'Bring printed assignments', opts:[
+    'bringing printed copies of {their} assignments to class by the deadline',
+    'having {their} annotated text and printed assignments with {them} every day, no matter what']},
+  {id:'vocab', label:'Define unfamiliar words', opts:[
+    'looking up and writing down definitions of all unfamiliar words in {their} annotations',
+    'building {their} vocabulary by defining every unfamiliar word {they} meet[s] in the reading']},
+  {id:'syllabus', label:'Know the syllabus policies', opts:[
+    'familiarizing {themself} with the policies of the syllabus, so that {they} need[s] no reminders',
+    'keeping the syllabus’s policies in mind as {they} plan[s] {their} work']},
+  {id:'account', label:'Take accountability', opts:[
+    'taking accountability when {they} {has} not finished the reading or annotations, rather than making excuses',
+    'owning missed reading honestly and making a plan to catch up']},
+  {id:'askclass', label:'Ask questions for the whole class', opts:[
+    'asking questions in class that are relevant to everyone, and saving questions about {their} own project for a meeting with me',
+    'reserving personal business for meetings outside of class']},
+  {id:'ready', label:'Be ready when class starts', opts:[
+    'being ready to start when class begins: seated, bag away, materials out, and thoughts collected',
+    'settling in quickly at the start of class, with {their} materials out and {their} thoughts collected']},
   {id:'hours', label:'Seek help in student hours', opts:[
     'coming to see me in student hours, where we can work through drafts and questions one on one',
     'seeking my help in student hours whenever a reading or assignment feels difficult']}
@@ -515,10 +547,10 @@ var SECTIONS = [
   {id:'open', title:'Opening', sents:[
     {tpl:'{Name} is <<open_adj>> member of our English {grade} class.'},
     {tpl:'<<open_more>>'}]},
+  {id:'part', title:'Class Participation', rubric:'part', sents:[]},
   {id:'read', title:'Reading', rubric:'read', sents:[
     {tpl:'{Their} reading of <<read_text>> was <<read_text_adj>>.', after:true}]},
   {id:'write', title:'Writing', rubric:'write', sents:[]},
-  {id:'part', title:'Class Participation', rubric:'part', sents:[]},
   {id:'sw', title:'Student Writing', grades:['9'], sents:[
     {tpl:'<<w9_intro>> “<<w9_quote>>”', w9:'quote'},
     {tpl:'{Name}’s {piece} about <<w9_topic>> was <<w9_adj>>.', w9:'topic'}]},
