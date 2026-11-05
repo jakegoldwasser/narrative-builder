@@ -437,13 +437,13 @@ var SLOTS = {
     '{They} bring[s] real creativity to {their} reading and writing.']},
   read_text:{type:'text', ph:'a text we read', list:'textsList'},
   read_text_adj:{opts:['especially perceptive','insightful','imaginative','careful and nuanced','a highlight of the {term}']},
-  w9_intro:{opts:[
+  w9_intro:{def:0, opts:[
+    '{Their} submission to the Writing Quarterly included this line:',
     'One line from {their} {piece} stayed with me:',
     '{Name}’s {piece} included this striking line:',
     '{Their} {piece} showed real craft, as in this line:',
-    'I still remember this moment from {their} {piece}:',
-    '{Their} submission to the Ninth Grade Writing Quarterly included this line:']},
-  w9_quote:{type:'text', ph:'paste a line of their writing', quote:true},
+    'I still remember this moment from {their} {piece}:']},
+  w9_quote:{type:'text', ph:'paste a line of their writing', quote:true, stub:'…'}, // shown until a line is pasted in
   w9_topic:{type:'text', ph:'subject or theme'},
   w9_adj:{opts:['poignant and surprising','vivid and moving','funny and inventive','courageous and imaginative','honest and powerful','beautifully observed']},
   close:{def:1, opts:[
@@ -740,7 +740,7 @@ function choiceOf(key, st){ var s = SLOTS[key], v = st.sel[key]; return v===unde
 /* returns the filled template, or null when unanswered (left out of the narrative) */
 function slotValue(key, st){
   var s = SLOTS[key];
-  if(s.type==='text'){ var t=(st.text[key]||'').trim(); return t ? (s.quote ? quoteFmt(t) : t) : null; }
+  if(s.type==='text'){ var t=(st.text[key]||'').trim(); return t ? (s.quote ? quoteFmt(t) : t) : s.stub || null; }
   var v = choiceOf(key, st);
   if(v==null || v==='' || v==='__none') return null;
   if(v==='__custom'){ var c=(st.custom[key]||'').trim(); return c || null; }
@@ -1597,6 +1597,7 @@ function upgrade(s){
   for(var k in s) b[k]=s[k];
   b.sel=b.sel||{}; b.rub=b.rub||{}; b.auto=b.auto||{}; b.custom=b.custom||{}; b.text=b.text||{}; b.extra=b.extra||{};
   b.w9 = Object.assign({mode:'quote', piece:'poem', pieceCustom:''}, s.w9||{});
+  if(b.sel.w9_intro==='{Their} submission to the Ninth Grade Writing Quarterly included this line:') b.sel.w9_intro = SLOTS.w9_intro.opts[0];
   if(b.override===undefined) b.override=null;
   b.grade = String(b.grade||'9');
   return b;
