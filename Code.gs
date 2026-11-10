@@ -5,6 +5,9 @@
  * A "Narratives" menu appears. Your work is stored in a file in your Google Drive, in the folder
  * "Narrative Builder data" beside this doc (with an hourly backup copy in its Backups folder), and the
  * doc is rewritten (a few seconds after each change) so it always shows every narrative.
+ * Edits typed straight into the doc are never lost: before the doc is written, and whenever the builder
+ * loads or checks for changes, each student's text in the doc is compared with what was last written
+ * there; one that differs was edited in the doc, and comes into the builder as a hand edit (pullDoc_).
  */
 
 function onOpen() {
@@ -155,14 +158,98 @@ function trashList_(d) {
 
 /** Returns everything saved so far as a JSON string. */
 function loadState() {
-  var d = readData_();
+  var d = withLock_(function () { var x = readData_(); if (pullDoc_(x).length) { x.rev = (+x.rev || 0) + 1; writeData_(x, false); } return x; });
   return JSON.stringify({ settings: d.settings, students: d.order.map(function (id) { var s = d.students[id]; if (s) s.baseAt = s.at || 0; return s; }).filter(Boolean),
     trash: trashList_(d), rev: String(d.rev) });
 }
 
 /** Changes with every save, so an open builder can tell that another window saved. */
 function getRev() {
+  try { checkDoc_(); } catch (e) {}
   return props_().getProperty('rev') || '0';
+}
+
+/* ---------------- Edits made in the doc ----------------
+ * The doc is one section per student: a "Name — Grade N" heading, the narrative's paragraphs, then the
+ * word count. writeDoc_ keeps what it wrote for each student in d.docText (and the heading in d.docHead);
+ * a section whose text no longer matches was edited in the doc, so it becomes that student's narrative
+ * in the builder (`override`, which the page turns into hand edits of just the parts that changed).
+ * A blank line between paragraphs is a new paragraph (\n\n); lines with no blank between, like a poem's,
+ * stay single lines (\n). */
+function withLock_(fn) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+function norm_(t) {
+  return String(t || '').replace(/\r/g, '').split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+function same_(a, b) { return norm_(a).replace(/\s+/g, ' ') === norm_(b).replace(/\s+/g, ' '); }
+function wordsOf_(t) { return (String(t || '').trim().match(/\S+/g) || []).length; }
+function headingOf_(st) { return (st.name || '(no name)') + ' — Grade ' + st.grade; }
+/* Each student's section as it reads in the doc now, by heading. */
+function docSections_() {
+  var body = getDoc_().getBody(), n = body.getNumChildren(), out = {}, cur = null, lines = null, gap = false;
+  var finish = function () { if (cur != null) out[cur] = lines.join('').trim(); };
+  for (var i = 0; i < n; i++) {
+    var el = body.getChild(i);
+    if (el.getType() !== DocumentApp.ElementType.PARAGRAPH && el.getType() !== DocumentApp.ElementType.LIST_ITEM) continue;
+    var p = el.getType() === DocumentApp.ElementType.PARAGRAPH ? el.asParagraph() : el.asListItem();
+    var t = p.getText().replace(/\r/g, '\n'), h = el.getType() === DocumentApp.ElementType.PARAGRAPH ? p.getHeading() : null;
+    if (h === DocumentApp.ParagraphHeading.HEADING2) { finish(); cur = t.trim(); lines = []; gap = false; continue; }
+    if (cur == null) continue;
+    if (!t.trim()) { gap = true; continue; }
+    if (/^\d+ words( — OVER 200 \(nothing was cut\))?$/.test(t.trim())) continue;
+    if (lines.length) lines.push(gap ? '\n\n' : '\n');
+    lines.push(t); gap = false;
+  }
+  finish();
+  return out;
+}
+/* Brings doc edits into d. Returns the ids of the students it changed. */
+function pullDoc_(d) {
+  var secs;
+  try { secs = docSections_(); } catch (e) { return []; }
+  d.docText = d.docText || {}; d.docHead = d.docHead || {};
+  var changed = [], now = Date.now();
+  d.order.forEach(function (id) {
+    var st = d.students[id]; if (!st) return;
+    var head = d.docHead[id] || headingOf_(st), text = secs[head];
+    if (text == null) text = secs[headingOf_(st)];
+    if (text == null || text === '(not started)') return;
+    var last = d.docText[id] != null ? d.docText[id] : (d.rows[id] ? d.rows[id].text : '');
+    if (same_(text, last)) return;
+    // edited in the doc: that's the narrative now
+    var t = norm_(text);
+    st.override = t; st.at = now;
+    var r = d.rows[id] || {};
+    d.rows[id] = { name: st.name, grade: st.grade, text: t, words: wordsOf_(t), state: wordsOf_(t) > 200 ? 'over' : 'done', at: now };
+    d.docText[id] = t;
+    changed.push(id);
+  });
+  props_().setProperty('DOC_CHECKED', String(now));
+  return changed;
+}
+/* Called with the builder's minute-by-minute check: if the doc changed since it was last looked at, bring its edits in. */
+function checkDoc_() {
+  var sp = props_(), seen = +(sp.getProperty('DOC_CHECKED') || 0);
+  var updated = DriveApp.getFileById(getDoc_().getId()).getLastUpdated().getTime();
+  if (updated <= seen) return;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    var d = readData_();
+    if (pullDoc_(d).length) { d.rev = (+d.rev || 0) + 1; writeData_(d, false); }
+  } finally { lock.releaseLock(); }
+}
+/* Writes the doc from d (after bringing in any edits made there first). */
+function syncDoc_(d) {
+  var written = writeDoc_(d.order.map(function (id) {
+    var r = d.rows[id] || { name: d.students[id].name, grade: d.students[id].grade, text: '', words: 0 };
+    r.id = id; return r;
+  }));
+  d.docText = written.text; d.docHead = written.head;
 }
 
 /** The Backups folder's address, for the builder's Backup window. */
@@ -182,6 +269,7 @@ function saveState(json) {
   lock.waitLock(25000);
   try {
     var d = readData_();
+    var pulled = pullDoc_(d); // edits typed into the doc since it was last written come in first, so this save can't write over them
     var removed = (p.removed || []).filter(function (id) { return d.students[id]; });
     if (removed.length || p.restored) backup_(d); // a copy of everything as it was, before students leave or a backup replaces them
     d.rev = (+d.rev || 0) + 1;
@@ -239,10 +327,9 @@ function saveState(json) {
     });
     d.settings = setS;
 
+    syncDoc_(d);
     writeData_(d, false);
-    writeDoc_(d.order.map(function (id) {
-      return d.rows[id] || { name: d.students[id].name, grade: d.students[id].grade, text: '', words: 0 };
-    }));
+    pulled.forEach(function (id) { if (kept.indexOf(id) === -1 && d.students[id]) kept.push(id); });
     return JSON.stringify({ rev: String(d.rev), kept: kept, trash: trashList_(d) });
   } finally {
     lock.releaseLock();
@@ -261,8 +348,9 @@ function restoreRemoved(id) {
       d.order.push(id);
       delete d.trash[id];
       d.rev = (+d.rev || 0) + 1;
+      pullDoc_(d);
+      syncDoc_(d);
       writeData_(d, false);
-      writeDoc_(d.order.map(function (k) { return d.rows[k] || { name: d.students[k].name, grade: d.students[k].grade, text: '', words: 0 }; }));
     }
   } finally {
     lock.releaseLock();
@@ -281,23 +369,33 @@ function writeDoc_(rows) {
   var started = rows.filter(function (r) { return r.state ? r.state !== 'blank' : r.words > 0; }).length; // a default closing alone isn't started
   body.appendParagraph(started + ' of ' + rows.length + ' started · updated ' +
       Utilities.formatDate(new Date(), tz, 'MMM d, h:mm a') +
-      ' · Edit in Narratives → Open Narrative Builder (changes made directly here are overwritten).')
+      ' · Edit here or in Narratives → Open Narrative Builder: changes made in either one show up in the other.')
     .setHeading(DocumentApp.ParagraphHeading.NORMAL)
     .editAsText().setItalic(true).setFontSize(9).setForegroundColor('#6b7378');
 
+  var wrote = { text: {}, head: {} };
   rows.forEach(function (r) {
-    var h = body.appendParagraph((r.name || '(no name)') + ' — Grade ' + r.grade);
+    var head = (r.name || '(no name)') + ' — Grade ' + r.grade;
+    var h = body.appendParagraph(head);
     h.setHeading(DocumentApp.ParagraphHeading.HEADING2);
     var empty = !r.text || !r.text.trim();
-    var paras = empty ? ['(not started)'] : r.text.split(/\n{2,}/);
-    paras.forEach(function (ptext) {
-      var t = body.appendParagraph(ptext).setHeading(DocumentApp.ParagraphHeading.NORMAL).editAsText();
-      t.setItalic(false).setFontSize(11).setForegroundColor('#1f2a2e');
-      if (empty) t.setItalic(true).setForegroundColor('#9aa0a3');
+    var text = empty ? '' : norm_(r.text);
+    var paras = empty ? ['(not started)'] : text.split(/\n{2,}/);
+    paras.forEach(function (ptext, i) {
+      if (i) body.appendParagraph('').setHeading(DocumentApp.ParagraphHeading.NORMAL); // a blank line between paragraphs
+      ptext.split('\n').forEach(function (line) { // a poem's lines, one to a line
+        var t = body.appendParagraph(line).setHeading(DocumentApp.ParagraphHeading.NORMAL).editAsText();
+        if (!line) return;
+        t.setItalic(false).setFontSize(11).setForegroundColor('#1f2a2e');
+        if (empty) t.setItalic(true).setForegroundColor('#9aa0a3');
+      });
     });
+    if (r.id) { wrote.text[r.id] = text; wrote.head[r.id] = head; }
     var note = r.words + ' words' + (r.words > 200 ? ' — OVER 200 (nothing was cut)' : '');
     var n = body.appendParagraph(note).setHeading(DocumentApp.ParagraphHeading.NORMAL).editAsText();
     n.setItalic(false).setFontSize(8).setForegroundColor(r.words > 200 ? '#b3261e' : '#9aa0a3');
   });
   doc.saveAndClose();
+  props_().setProperty('DOC_CHECKED', String(Date.now()));
+  return wrote;
 }
